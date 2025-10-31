@@ -1,0 +1,156 @@
+{
+  "persistent_hyperglycemia_global": {
+    "pattern_name": "Persistent Hyperglycemia (Global)",
+    "category": "Metrics",
+    "shape": "Sustained high flat plateau with minimal peaks and valleys",
+    "risk": "High (Chronic)",
+    "actions": "0. Take a closer look into patient data and context details\n1. Review current medication regimen and adherence\n2. Assess carbohydrate intake and meal timing patterns\n3. Refer to provider for potential medication adjustment, initiation, or dose increase\n4. Educate on carbohydrate counting and portion control\n5. Set A1C and time-in-range goals with patient"
+  },
+  "frequent_hypoglycemia_global": {
+    "pattern_name": "Frequent Hypoglycemia (Global)",
+    "category": "Metrics",
+    "shape": "Consistent valleys distrubuted aross multiple times a day",
+    "risk": "High",
+    "actions": "0. Take a closer look into patient data and context details\n1. Review all hypoglycemia episodes for timing and potential triggers\n2. Assess patient blood glucose lowering medications (insulin, sulfonylureas, meglitinides)\n3. Refer to provider for immediate medication reduction\n4. Assess meal timing, carbohydrate intake, and physical activity patterns\n5. Educate on hypoglycemia recognition, treatment, and prevention\n6. Recommend increasing CGM low alert threshold (75-80 mg/dL)"
+  },
+  "high_glycemic_variability": {
+    "pattern_name": "High Glycemic Variability",
+    "category": "Metrics",
+    "shape": "Rollercoaster wings, wide band with unpredictable peaks and valleys",
+    "risk": "Moderate",
+    "actions": "0. Take a closer look into patient data and context details\n1. Identify patterns of highs and lows throughout the day\n2. Review carbohydrate consistency and meal timing\n3. Assess insulin dosing accuracy and timing (if applicable)\n4. Educate on pairing carbohydrates with protein and fat\n5. Refer to provider for potential medication adjustment\n6. Endocrinology referral/escalation"
+  },
+  "overnight_compression_low": {
+    "pattern_name": "Overnight Compression Low",
+    "category": "Hypoglycemia",
+    "shape": "Sudden steep vertical drop that is very flat and sharp without gradual increase/decreases",
+    "risk": "Safety\u2011Critical (Avoid Mistreatment)",
+    "actions": "Recommend fingerstick verification, if off by > 20 mg/dl, then likely compression low. Recommend switching sensor and moving to another site.\n\n\n0. Take a closer look into patient data and context details\n1. Review CGM trace and look for characteristic compression pattern (sharp drop and rise, v-shape), a true hypo will be a gradual slow decline\n2. Confirm compression vs. true hypoglycemia before medication changes (double check with fingersticks, assess symptoms)\n3. Educate patient on sensor placement away from pressure points\n4. Review sleep position and recommend sensor site rotation"
+  },
+  "nocturnal_hypoglycemia_moderate": {
+    "pattern_name": "Nocturnal Hypoglycemia - Moderate",
+    "category": "Hypoglycemia",
+    "shape": "Prolonged Dip",
+    "risk": "High",
+    "actions": "1. Do not give corrections after dinner (biggest reason), but change insulin dose before dinner to prevent corrections\n2. Taking insulin before dinner, not after\n3. Reduce/retime basal;\n4. Adjust bedtime correction scale\n5. Reduce evening alcohol\n6. Relax BG targets control in older pts (75yr)\n7. Less insulin around if excercise around dinner"
+  },
+  "nocturnal_hypoglycemia_severe": {
+    "pattern_name": "Nocturnal Hypoglycemia - Severe",
+    "category": "Hypoglycemia",
+    "shape": "Prolonged Dip",
+    "risk": "High",
+    "actions": "1. Do not give corrections after dinner (biggest reason), but change insulin dose before dinner to prevent corrections\n2. Taking insulin before dinner, not after\n3. Reduce/retime basal;\n4. Adjust bedtime correction scale\n5. Reduce evening alcohol\n6. Relax BG targets control in older pts (75yr)\n7. Less insulin around if excercise around dinner"
+  },
+  "early_morning_hypoglycemia": {
+    "pattern_name": "Early Morning Hypoglycemia",
+    "category": "Hypoglycemia",
+    "shape": "Decline that is gradual, curve is a gentle slop then dip",
+    "risk": "Moderate",
+    "actions": "1. Reduce/split basal insulin (too much basal)\n2. Midnight snack +insulin -- should eat nuts or cheese that doesn't need insulin\n3. Most common reason - AID insulin pump patients"
+  },
+  "mid_morning_hypoglycemia": {
+    "pattern_name": "Mid Morning Hypoglycemia",
+    "category": "Hypoglycemia",
+    "shape": "Rising and fast drop below range",
+    "risk": "Mod\u2013High (if medication-related)",
+    "actions": "1. Adjust meal time insulin\n2. Less glycemic meal + protein and fat"
+  },
+  "afternoon_hypoglycemia": {
+    "pattern_name": "Afternoon Hypoglycemia",
+    "category": "Hypoglycemia",
+    "shape": "Gradual decline occuring midday",
+    "risk": "Moderate",
+    "actions": "1. Reduce lunch bolus dose by 10\u201320% or adjust carb-to-insulin ratio.\n2. Encourage consistent small lunch or snack even if using GLP-1 RA.\n3. Review basal insulin timing/dose if exercise in afternoon \u2192 consider temporary basal reduction or post-exercise snack.\n4. Educate on insulin sensitivity increase after exercise \u2192 monitor CGM more frequently within 4 hours.\n5. Limit alcohol intake and avoid drinking without food."
+  },
+  "evening_hypoglycemia": {
+    "pattern_name": "Evening Hypoglycemia",
+    "category": "Hypoglycemia",
+    "shape": "Gradual decline in evening",
+    "risk": "Mod-High",
+    "actions": "1. Reduce dinner bolus by 10\u201320% or use lower insulin carb ratio for post-exercise dinners.\n2. If evening exercise common \u2192 reduce basal dose or add bedtime snack (15 g CHO + protein).\n3. Encourage post-meal glucose check and CGM alert set at 80 mg/dL for pre-warning.\n4. Limit alcohol before bed and pair with food if drinking with dinner."
+  },
+  "pre_bed_hypoglycemia": {
+    "pattern_name": "Pre\u2011Bed Hypoglycemia",
+    "category": "Hypoglycemia",
+    "shape": "Gradual decline in late evening",
+    "risk": "High",
+    "actions": "1. Consider reducing dinner bolus or basal rate in evening.\n2. Encourage bedtime snack (15\u201320 g CHO + protein if BG < 110 mg/dL).\n3. Avoid vigorous late-evening exercise or adjust insulin accordingly.\n4. Educate on delayed hypoglycemia risk after alcohol and importance of bedtime BG check.\n5. Set CGM alert for < 80 mg/dL overnight."
+  },
+  "dawn_phenomenon": {
+    "pattern_name": "Dawn Phenomenon",
+    "category": "Hyperglycemia",
+    "shape": "Stable overnight baseline followed by gradual rise and peaking before breakfast, without prior lows, appears as a smooth upward slope from flat overnight shape",
+    "risk": "Moderate",
+    "actions": "1. Titrating medications, basal, metformin\n2. Excercise close to bedtime (improve insulin sensitivity after 5hrs)\n3. Insulin pump adjustment\n4. Complex carbs with fat & protrein (greek yourt and nuts etc)"
+  },
+  "somogyi": {
+    "pattern_name": "Somogyi",
+    "category": "Hyperglycemia",
+    "shape": "V-shaped night curve, dip then overshoot shape",
+    "risk": "High",
+    "actions": "1. Titrating medications, basal, metformin\n2. Excercise close to bedtime (improve insulin sensitivity after 5hrs)\n3. Insulin pump adjustment\n4. Complex carbs with fat & protrein (greek yourt and nuts etc)"
+  },
+  "prolonged_overnight_hyperglycemia": {
+    "pattern_name": "Prolonged Overnight Hyperglycemia",
+    "category": "Hyperglycemia",
+    "shape": "Sustained elevation overnight without variation, flat high line",
+    "risk": "Moderate",
+    "actions": "1. Reduce late carbs\n2. Excercise during the day or night \n3. Sleep quality \n4. Increase basal insulin \n5. Avoid high fat meal for dinner\n6. Confirm bedtime and 03:00 readings to rule out post-dinner carryover."
+  },
+  "morning_hyperglycemia_fasting_high": {
+    "pattern_name": "Morning Hyperglycemia (Fasting High)",
+    "category": "Hyperglycemia",
+    "shape": "Steady high plateau in the morning",
+    "risk": "Moderate",
+    "actions": "1. Morning exercise\n2. Missed medication"
+  },
+  "morning_spike": {
+    "pattern_name": "Morning Spike",
+    "category": "Spike",
+    "shape": "Rapid Spike & Slow Drop;\nRapid Spike & Rapid Drop;\nRebound",
+    "risk": "Low (Chronic Risk)",
+    "actions": "1. Nutrition related: food choice\n2. Exercise related - snack before exercise with protein and carbs\n3. Stress related - adjust insulin; walking; mindfulness"
+  },
+  "afternoon_spike": {
+    "pattern_name": "Afternoon Spike",
+    "category": "Spike",
+    "shape": "Rapid Spike & Slow Drop;\nRapid Spike & Rapid Drop;\nRebound",
+    "risk": "Low (Chronic Risk)",
+    "actions": "1. Nutrition related: food choice\n2. Exercise related - snack before exercise with protein and carbs\n3. Stress related - adjust insulin; walking; mindfulness"
+  },
+  "evening_spike": {
+    "pattern_name": "Evening Spike",
+    "category": "Spike",
+    "shape": "Rapid Spike & Slow Drop;\nRapid Spike & Rapid Drop;\nRebound",
+    "risk": "Low (Chronic Risk)",
+    "actions": "1. Nutrition related: food choice\n2. Med related:\n2. Exercise related - snack before exercise with protein and carbs\n3. Stress related - adjust insulin; walking; mindfulness"
+  },
+  "prolonged_plateau_spike": {
+    "pattern_name": "Prolonged Plateau Spike",
+    "category": "Spike",
+    "shape": "Rapid rise followed by sustained plateau before retuning to baseline; sharp climb then flat high line",
+    "risk": "Low (Chronic Risk)",
+    "actions": "1. Adjust insulin\n2. Adjust\n3. Exercise \n4. [eating order] Salad + protein first, then main meal"
+  },
+  "frequent_spikes": {
+    "pattern_name": "Frequent Spikes",
+    "category": "Spike",
+    "shape": "Multiple sharp increases and falls within the same dayl a sawtooth trace",
+    "risk": "Moderate (recurrent highs, increase A1C)",
+    "actions": "1. Nutrition: fat and protein add to fruit/carb snack\n2. Nutrition education on beverages\n3. Counseling for emotional eating \n4. Initiate GLP-1"
+  },
+  "dual_peak_double_spike": {
+    "pattern_name": "Dual Peak (Double Spike)",
+    "category": "Spike",
+    "shape": "Two distinct peaks that return to baseline, double-hump, camel-back shape",
+    "risk": "Moderate",
+    "actions": "\u2022 Use split-bolus or extended bolus if on insulin (e.g., 50 % upfront, 50 % 1.5\u20132 h later for mixed meals).\n\u2022 Pre-bolus 15\u201320 min before eating to match digestion rate for high-carb foods.\n\u2022 Reduce fat and refined-carb combination meals (pizza, fried foods, creamy sauces).\n\u2022 Add non-starchy vegetables or fiber to slow carb absorption.\n\u2022 If non-insulin user \u2192 take metformin/GLP-1 RA before large meal to blunt postprandial glucose.\n\u2022 Post-meal light activity (10\u201315 min walk at 60\u201390 min) to flatten the second rise.\n\u2022 Review CGM for delayed peaks > 3 h post-meal \u2192 adjust future dosing or meal composition."
+  },
+  "day_to_day_variability_eg_weekends_certain_weekday": {
+    "pattern_name": "Day to Day Variability (eg., weekends, certain weekday)",
+    "category": "Variability",
+    "shape": "Alternating stable vs high/lows days that differ by day of week, patchwork pattern",
+    "risk": "Moderate",
+    "actions": "Reduce weekend alcohol or late-night snacking.\n\u2022 Track \u201ctrigger days\u201d (e.g., work stress, long commutes) and implement behavioral countermeasures (mindful eating, pre-packed lunch).\n\u2022 For insulin users: consider small basal adjustments (\u00b1 10 %) if patterns repeat on certain days.\n\u2022 Educate on sleep consistency\u2014aim \u2265 7 h; circadian disruption can raise fasting glucose."
+  }
+}

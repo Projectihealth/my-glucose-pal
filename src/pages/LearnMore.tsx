@@ -5,7 +5,7 @@ import { ArrowUpRight } from "lucide-react";
 const ARTICLES = [
   {
     id: "olivia-overview",
-    title: "Meet My Glucose Pal",
+    title: "Meet Your CGM Coach, Olivia",
     summary: "Discover how Olivia weaves CGM trends, coaching insights, and community support into your daily routine.",
     readTime: "8 min read",
     to: "/learn-more/olivia",
@@ -80,14 +80,14 @@ const LearnMore = () => (
               <Link
                 key={article.id}
                 to={article.to}
-                className="w-full rounded-2xl border border-border/70 bg-white px-4 py-3 text-left transition hover:border-primary/40 hover:bg-primary/5"
+                className="block w-full rounded-2xl border border-border/70 bg-white px-4 py-4 transition hover:border-primary/40 hover:bg-primary/5"
               >
-                <div className="flex items-center justify-between">
-                  <p className="text-sm font-semibold">{article.title}</p>
-                  <ArrowUpRight className="h-4 w-4 text-primary" />
+                <div className="flex items-center justify-between gap-3">
+                  <p className="text-sm font-semibold leading-snug">{article.title}</p>
+                  <ArrowUpRight className="h-4 w-4 flex-shrink-0 text-primary" />
                 </div>
-                <p className="mt-1 text-xs text-muted-foreground">{article.summary}</p>
-                <p className="mt-2 text-xs font-medium text-muted-foreground">{article.readTime}</p>
+                <p className="mt-2 text-xs text-muted-foreground leading-relaxed">{article.summary}</p>
+                <p className="mt-3 text-xs font-medium text-muted-foreground">{article.readTime}</p>
               </Link>
             ))}
           </div>

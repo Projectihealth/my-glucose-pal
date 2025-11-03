@@ -60,6 +60,24 @@ This project is built with:
 - shadcn-ui
 - Tailwind CSS
 
+## CGM Butler Integration
+
+This app now includes the Olivia video avatar experience from the `cgm_butler` project. To enable it:
+
+1. Start the CGM Butler Flask backend from `cgm_butler/dashboard/app.py` (default port `5000`).
+2. Provide the Tavus/OpenAI credentials the backend requires (see `cgm_butler/README.md`).
+3. In this project, create a `.env` file (or update the existing one) and set:
+
+   ```bash
+   VITE_CGM_BUTLER_BACKEND_URL=http://localhost:5000
+   VITE_TAVUS_API_KEY=your-tavus-api-key
+   VITE_TAVUS_PERSONA_ID=your-persona-id
+   VITE_TAVUS_REPLICA_ID=your-replica-id
+   ```
+
+   The backend URL defaults to `http://localhost:5000` if unspecified, but the Tavus keys are required for the video avatar.
+4. Start the front-end with `npm run dev` and open the home page – the “Meet Olivia” section will load the shared avatar UI and display the video conversation once credentials are valid.
+
 ## How can I deploy this project?
 
 Simply open [Lovable](https://lovable.dev/projects/8a461ca5-0b84-4e71-bb43-7bfbf8e636e4) and click on Share -> Publish.

@@ -1,126 +1,187 @@
+import { useMemo } from "react";
 import { Card } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
-import { TrendingUp, TrendingDown, Activity, Apple, Moon } from "lucide-react";
+import { Activity, Apple, Moon, TrendingUp } from "lucide-react";
+import { useUserPreferences } from "@/context/UserPreferencesContext";
+import { useGlucoseTrend } from "@/hooks/useGlucoseTrend";
 
-export const Dashboard = () => {
+interface DashboardProps {
+  selectedDay: string | null;
+}
+
+export const Dashboard = ({ selectedDay }: DashboardProps) => {
+  const { preferences } = useUserPreferences();
+  const { points, loading, updateIntervalMinutes } = useGlucoseTrend(
+    preferences.locale,
+    preferences.timezone,
+    selectedDay,
+  );
+  const stepMinutes = updateIntervalMinutes ?? 5;
+
+  const timeInRange = useMemo(() => {
+    if (!points.length) return null;
+
+    let totalMinutes = 0;
+    let inRangeMinutes = 0;
+
+    for (let i = 0; i < points.length; i += 1) {
+      const current = points[i];
+      const next = points[i + 1];
+      const delta = next
+        ? Math.max(1, (next.timestamp - current.timestamp) / 60000)
+        : stepMinutes;
+      totalMinutes += delta;
+      if (current.glucose >= 70 && current.glucose <= 140) {
+        inRangeMinutes += delta;
+      }
+    }
+
+    const percentage = totalMinutes ? (inRangeMinutes / totalMinutes) * 100 : 0;
+    return {
+      percentage: percentage.toFixed(1),
+      minutes: Math.round(inRangeMinutes),
+    };
+  }, [points]);
+
+  const segments = useMemo(() => {
+    const buckets = [
+      { label: "Night (0-6)", start: 0, end: 360 },
+      { label: "Morning (6-12)", start: 360, end: 720 },
+      { label: "Afternoon (12-18)", start: 720, end: 1080 },
+      { label: "Evening (18-24)", start: 1080, end: 1440 },
+    ];
+
+    if (!points.length) {
+      return buckets.map((bucket) => ({ label: bucket.label, score: 0, status: "--" }));
+    }
+
+    return buckets.map((bucket) => {
+      let totalMinutes = 0;
+      let minutesInRange = 0;
+
+      for (let i = 0; i < points.length; i += 1) {
+        const current = points[i];
+        if (current.minutesOfDayUtc < bucket.start || current.minutesOfDayUtc >= bucket.end) continue;
+
+        const next = points[i + 1];
+        const nextMinutes = next ? Math.min(next.minutesOfDayUtc, bucket.end) : bucket.end;
+        let delta = next
+          ? Math.max(1, (next.timestamp - current.timestamp) / 60000)
+          : stepMinutes;
+
+        const remainingWithinBucket = Math.max(0, nextMinutes - current.minutesOfDayUtc);
+        if (remainingWithinBucket > 0) {
+          delta = Math.min(delta, remainingWithinBucket);
+        }
+
+        totalMinutes += delta;
+        if (current.glucose >= 70 && current.glucose <= 140) {
+          minutesInRange += delta;
+        }
+      }
+
+      const percentage = totalMinutes ? (minutesInRange / totalMinutes) * 100 : 0;
+      const status = percentage >= 80 ? "Excellent" : percentage >= 60 ? "Good" : percentage >= 40 ? "Moderate" : "Needs attention";
+
+      return {
+        label: bucket.label,
+        score: Math.round(percentage),
+        status,
+      };
+    });
+  }, [points]);
+
   return (
-    <section className="py-20 px-4">
-      <div className="max-w-6xl mx-auto">
-        <div className="text-center mb-12">
-          <h2 className="text-4xl font-bold mb-4">Your Health Dashboard</h2>
-          <p className="text-xl text-muted-foreground">
-            Track your progress and insights at a glance
-          </p>
+    <section className="px-6 py-8 bg-muted/40">
+      <div className="space-y-3">
+        <div className="space-y-1">
+          <h2 className="text-2xl font-bold">Daily Snapshot</h2>
+          <p className="text-sm text-muted-foreground">Key vitals from the selected day.</p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-          <Card className="p-6">
-            <div className="flex items-center justify-between mb-4">
-              <div className="w-10 h-10 rounded-full gradient-primary flex items-center justify-center">
-                <TrendingUp className="w-5 h-5 text-white" />
-              </div>
-              <span className="text-2xl font-bold text-primary">94%</span>
-            </div>
-            <h3 className="font-semibold mb-1">Time in Range</h3>
-            <p className="text-sm text-muted-foreground">Last 7 days</p>
-          </Card>
-
-          <Card className="p-6">
-            <div className="flex items-center justify-between mb-4">
-              <div className="w-10 h-10 rounded-full bg-accent flex items-center justify-center">
-                <Activity className="w-5 h-5 text-white" />
-              </div>
-              <span className="text-2xl font-bold text-accent">15</span>
-            </div>
-            <h3 className="font-semibold mb-1">Active Days</h3>
-            <p className="text-sm text-muted-foreground">This month</p>
-          </Card>
-
-          <Card className="p-6">
-            <div className="flex items-center justify-between mb-4">
-              <div className="w-10 h-10 rounded-full bg-secondary flex items-center justify-center">
-                <Apple className="w-5 h-5 text-white" />
-              </div>
-              <span className="text-2xl font-bold text-secondary">8/10</span>
-            </div>
-            <h3 className="font-semibold mb-1">Nutrition Score</h3>
-            <p className="text-sm text-muted-foreground">Today</p>
-          </Card>
-
-          <Card className="p-6">
-            <div className="flex items-center justify-between mb-4">
-              <div className="w-10 h-10 rounded-full bg-chart-4 flex items-center justify-center">
-                <Moon className="w-5 h-5 text-white" />
-              </div>
-              <span className="text-2xl font-bold" style={{ color: 'hsl(var(--chart-4))' }}>7.5h</span>
-            </div>
-            <h3 className="font-semibold mb-1">Sleep Quality</h3>
-            <p className="text-sm text-muted-foreground">Average</p>
-          </Card>
-        </div>
-
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <Card className="p-6">
-            <h3 className="text-xl font-bold mb-6">Daily Patterns</h3>
-            <div className="space-y-4">
-              <div>
-                <div className="flex justify-between mb-2">
-                  <span className="text-sm font-medium">Morning (6-12)</span>
-                  <span className="text-sm text-muted-foreground">Excellent</span>
+        <div className="grid grid-cols-1 gap-4">
+          <Card className="p-5 rounded-3xl border-border/60">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl gradient-primary flex items-center justify-center">
+                  <TrendingUp className="w-5 h-5 text-white" />
                 </div>
-                <Progress value={95} className="h-2" />
-              </div>
-              <div>
-                <div className="flex justify-between mb-2">
-                  <span className="text-sm font-medium">Afternoon (12-18)</span>
-                  <span className="text-sm text-muted-foreground">Good</span>
-                </div>
-                <Progress value={85} className="h-2" />
-              </div>
-              <div>
-                <div className="flex justify-between mb-2">
-                  <span className="text-sm font-medium">Evening (18-24)</span>
-                  <span className="text-sm text-muted-foreground">Moderate</span>
-                </div>
-                <Progress value={70} className="h-2" />
-              </div>
-              <div>
-                <div className="flex justify-between mb-2">
-                  <span className="text-sm font-medium">Night (0-6)</span>
-                  <span className="text-sm text-muted-foreground">Excellent</span>
-                </div>
-                <Progress value={92} className="h-2" />
-              </div>
-            </div>
-          </Card>
-
-          <Card className="p-6">
-            <h3 className="text-xl font-bold mb-6">Today's Insights</h3>
-            <div className="space-y-4">
-              <div className="flex gap-3 p-3 rounded-lg bg-primary/10">
-                <TrendingUp className="w-5 h-5 text-primary mt-0.5" />
                 <div>
-                  <p className="font-medium">Great morning routine!</p>
-                  <p className="text-sm text-muted-foreground">Your fasting glucose was perfect today.</p>
+                  <p className="text-xs uppercase tracking-wide text-muted-foreground">Time in range</p>
+                  <p className="text-xl font-semibold">
+                    {loading || !timeInRange ? "--" : `${timeInRange.percentage}%`}
+                  </p>
+                  <p className="text-[11px] text-muted-foreground">
+                    {loading || !timeInRange
+                      ? "Calculating..."
+                      : `${timeInRange.minutes} minutes between 70-140 mg/dL`}
+                  </p>
                 </div>
               </div>
-              <div className="flex gap-3 p-3 rounded-lg bg-accent/10">
-                <Activity className="w-5 h-5 text-accent mt-0.5" />
+              <span className="text-xs text-muted-foreground">Selected day</span>
+            </div>
+          </Card>
+
+          <Card className="p-5 rounded-3xl border-border/60">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-accent flex items-center justify-center">
+                  <Activity className="w-5 h-5 text-white" />
+                </div>
                 <div>
-                  <p className="font-medium">Exercise detected</p>
-                  <p className="text-sm text-muted-foreground">30-minute walk improved insulin sensitivity.</p>
+                  <p className="text-xs uppercase tracking-wide text-muted-foreground">Active days</p>
+                  <p className="text-xl font-semibold">10</p>
                 </div>
               </div>
-              <div className="flex gap-3 p-3 rounded-lg bg-secondary/10">
-                <Apple className="w-5 h-5 text-secondary mt-0.5" />
+              <span className="text-xs text-muted-foreground">This month</span>
+            </div>
+          </Card>
+
+          <Card className="p-5 rounded-3xl border-border/60">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-secondary flex items-center justify-center">
+                  <Apple className="w-5 h-5 text-white" />
+                </div>
                 <div>
-                  <p className="font-medium">Smart meal choice</p>
-                  <p className="text-sm text-muted-foreground">Lunch kept you stable for 4 hours.</p>
+                  <p className="text-xs uppercase tracking-wide text-muted-foreground">Nutrition score</p>
+                  <p className="text-xl font-semibold">8 / 10</p>
                 </div>
               </div>
+              <span className="text-xs text-muted-foreground">Today</span>
+            </div>
+          </Card>
+
+          <Card className="p-5 rounded-3xl border-border/60">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-chart-4 flex items-center justify-center">
+                  <Moon className="w-5 h-5 text-white" />
+                </div>
+                <div>
+                  <p className="text-xs uppercase tracking-wide text-muted-foreground">Sleep quality</p>
+                  <p className="text-xl font-semibold" style={{ color: "hsl(var(--chart-4))" }}>7.5h</p>
+                </div>
+              </div>
+              <span className="text-xs text-muted-foreground">Average</span>
             </div>
           </Card>
         </div>
+
+        <Card className="p-5 rounded-3xl border-border/60">
+          <h3 className="text-lg font-semibold mb-4">Daily Patterns</h3>
+          <div className="space-y-4">
+            {segments.map((segment) => (
+              <div key={segment.label}>
+                <div className="flex justify-between text-xs mb-2">
+                  <span>{segment.label}</span>
+                  <span className="text-muted-foreground">{segment.status}</span>
+                </div>
+                <Progress value={segment.score} className="h-2" />
+              </div>
+            ))}
+          </div>
+        </Card>
       </div>
     </section>
   );

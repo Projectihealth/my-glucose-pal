@@ -32,6 +32,7 @@ export const ActivityLogButton = () => {
   const [timestamp, setTimestamp] = useState(defaultTimestamp);
   const [medicationName, setMedicationName] = useState("");
   const [dose, setDose] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const isMedication = category === "medication";
 
@@ -57,25 +58,37 @@ export const ActivityLogButton = () => {
     setDose("");
   };
 
-  const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (isSubmitDisabled) return;
+    if (isSubmitDisabled || isSubmitting) return;
 
-    addLog({
-      title: title.trim(),
-      category: category === "food" ? "food" : category === "lifestyle" ? "lifestyle" : "medication",
-      note: note.trim() || undefined,
-      timestamp: new Date(timestamp).toISOString(),
-      medicationName: isMedication ? medicationName.trim() : undefined,
-      dose: isMedication ? dose.trim() || undefined : undefined,
-    });
+    setIsSubmitting(true);
+    try {
+      await addLog({
+        title: title.trim(),
+        category: category === "food" ? "food" : category === "lifestyle" ? "lifestyle" : "medication",
+        note: note.trim() || undefined,
+        timestamp: new Date(timestamp).toISOString(),
+        medicationName: isMedication ? medicationName.trim() : undefined,
+        dose: isMedication ? dose.trim() || undefined : undefined,
+      });
 
-    toast({
-      title: "Logged",
-      description: "Your entry will appear on today’s CGM timeline.",
-    });
+      toast({
+        title: "Logged",
+        description: "Your entry will appear on today’s CGM timeline.",
+      });
 
-    handleOpenChange(false);
+      handleOpenChange(false);
+    } catch (error) {
+      console.error("Failed to log activity", error);
+      toast({
+        title: "Something went wrong",
+        description: error instanceof Error ? error.message : "Unable to save activity log.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -165,8 +178,8 @@ export const ActivityLogButton = () => {
             />
           </div>
           <DialogFooter>
-            <Button type="submit" disabled={isSubmitDisabled} className="w-full">
-              Save to timeline
+            <Button type="submit" disabled={isSubmitDisabled || isSubmitting} className="w-full">
+              {isSubmitting ? "Saving…" : "Save to timeline"}
             </Button>
           </DialogFooter>
         </form>

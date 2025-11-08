@@ -23,7 +23,7 @@ export const Hero = ({ showActions = true }: HeroProps) => {
         </h1>
 
         <p className="text-base text-muted-foreground">
-          Dive into your real-time CGM insights and chat with Olivia in the palm of your hand.
+          Dive into your real-time CGM insights and chat with Olivia, your CGM bestie who actually gets it.
         </p>
 
         {showActions && (

@@ -24,6 +24,18 @@ export const ChatInterface = () => {
         offline: "I’m offline right now, but once the CGM Butler service is running I’ll jump back in with support.",
         startError: "I’m having trouble reaching my brain right now. Once the CGM Butler backend is available, feel free to try again.",
         thinking: "Olivia is thinking...",
+        helperIntro:
+          "I'm here to help you understand your glucose data and support you on your health journey. Think of me as your caring companion who's always in your corner!",
+        helperTitle: "I can help you with:",
+        helperItems: [
+          "📊 Checking your current glucose levels",
+          "🔍 Spotting patterns in your data",
+          "💡 Suggesting personalized tips",
+          "📈 Celebrating your progress together",
+        ],
+        helperOutro:
+          "Feel free to ask me anything—I'm here for you!",
+        helperTip: "💡 Tip: Click the video avatar to continue the conversation face to face (coming soon).",
       },
       "Español": {
         sectionBadge: "Conserje de chat",
@@ -34,6 +46,17 @@ export const ChatInterface = () => {
         offline: "Estoy desconectada por ahora, pero en cuanto el servicio se reactive volveré a ayudarte.",
         startError: "No puedo conectar con el backend ahora mismo. Inténtalo de nuevo cuando el servicio esté disponible.",
         thinking: "Olivia está pensando...",
+        helperIntro:
+          "Estoy aquí para ayudarte a entender tus datos de glucosa y acompañarte en tu camino de salud. ¡Piensa en mí como tu compañera que siempre está de tu lado!",
+        helperTitle: "Puedo ayudarte con:",
+        helperItems: [
+          "📊 Revisar tu glucosa actual",
+          "🔍 Detectar patrones en tus datos",
+          "💡 Sugerir consejos personalizados",
+          "📈 Celebrar tus progresos",
+        ],
+        helperOutro: "Pregúntame lo que necesites—¡estoy aquí para ti!",
+        helperTip: "💡 Consejo: Haz clic en el avatar de video para continuar la conversación cara a cara (pronto).",
       },
       "中文": {
         sectionBadge: "文字助手",
@@ -44,6 +67,16 @@ export const ChatInterface = () => {
         offline: "我现在暂时离线，等 CGM Butler 服务恢复后会立刻回复你。",
         startError: "目前无法连接后台，请稍后再试。",
         thinking: "Olivia 正在思考...",
+        helperIntro: "我会陪你一起解读血糖数据，支持你的健康旅程。把我当成始终站在你这边的贴心伙伴吧！",
+        helperTitle: "我可以帮你：",
+        helperItems: [
+          "📊 查看当前血糖值",
+          "🔍 识别数据中的模式",
+          "💡 提供个性化建议",
+          "📈 一起庆祝你的进步",
+        ],
+        helperOutro: "随时都可以来问我问题——我一直都在！",
+        helperTip: "💡 小贴士：点击视频头像即可面对面交流（即将上线）。",
       },
     })[preferences.language] ?? {
       sectionBadge: "Text concierge",
@@ -54,6 +87,17 @@ export const ChatInterface = () => {
       offline: "I’m offline right now, but once the CGM Butler service is running I’ll jump back in with support.",
       startError: "I’m having trouble reaching my brain right now. Once the CGM Butler backend is available, feel free to try again.",
       thinking: "Olivia is thinking...",
+      helperIntro:
+        "I'm here to help you understand your glucose data and support you on your health journey. Think of me as your caring companion who's always in your corner!",
+      helperTitle: "I can help you with:",
+      helperItems: [
+        "📊 Checking your current glucose levels",
+        "🔍 Spotting patterns in your data",
+        "💡 Suggesting personalized tips",
+        "📈 Celebrating your progress together",
+      ],
+      helperOutro: "Feel free to ask me anything—I'm here for you!",
+      helperTip: "💡 Tip: Click the video avatar to continue the conversation face to face (coming soon).",
     },
     [preferences.language],
   );
@@ -193,6 +237,22 @@ export const ChatInterface = () => {
           <p className="text-xs font-semibold uppercase tracking-[0.25em] text-primary/70">{copy.sectionBadge}</p>
           <h2 className="text-2xl font-bold">{copy.sectionTitle}</h2>
           <p className="text-sm text-muted-foreground">{copy.sectionSubtitle}</p>
+        </div>
+
+        <div className="rounded-3xl border border-border/60 bg-muted/20 p-5 space-y-3 text-sm text-muted-foreground">
+          <p className="text-base font-semibold text-foreground">{copy.helperIntro}</p>
+          <div className="space-y-2">
+            <p className="text-foreground font-medium">{copy.helperTitle}</p>
+            <ul className="list-disc pl-5 space-y-1">
+              {copy.helperItems.map((item) => (
+                <li key={item} className="text-muted-foreground">
+                  {item}
+                </li>
+              ))}
+            </ul>
+          </div>
+          <p className="text-foreground">{copy.helperOutro}</p>
+          <p className="text-xs text-primary/80">{copy.helperTip}</p>
         </div>
 
         <Card className="p-4 rounded-3xl shadow-sm border-border/60">

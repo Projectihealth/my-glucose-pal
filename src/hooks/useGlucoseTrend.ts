@@ -113,6 +113,15 @@ export const useGlucoseTrend = (
 
   const availableDays = useMemo(() => {
     const days = Object.keys(dayMap).sort();
+    if (!days.length) return days;
+
+    const desiredStart = "2025-11-09";
+    const desiredEnd = "2025-11-19";
+    const targetedRange = days.filter((day) => day >= desiredStart && day <= desiredEnd);
+    if (targetedRange.length > 0) {
+      return targetedRange;
+    }
+
     if (days.length <= 10) return days;
     return days.slice(days.length - 10);
   }, [dayMap]);

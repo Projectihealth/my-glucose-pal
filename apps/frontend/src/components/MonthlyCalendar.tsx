@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
@@ -10,7 +10,7 @@ import { ChevronLeft, ChevronRight, Star } from "lucide-react";
 
 interface MonthlyCalendarProps {
   selectedDay: string | null;
-  onSelectDay: (day: string) => void;
+  onSelectDay: (localDay: string) => void;
 }
 
 const WEEKDAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -47,7 +47,35 @@ export const MonthlyCalendar = ({ selectedDay, onSelectDay }: MonthlyCalendarPro
   const { summaries, allDays, loading } = useGlucoseCalendarData(preferences.locale);
   const { logs } = useActivityLog();
 
-  const [viewDate, setViewDate] = useState(() => getDefaultMonth(selectedDay, allDays));
+  const dayFormatter = useMemo(
+    () =>
+      new Intl.DateTimeFormat("en-CA", {
+        timeZone: preferences.timezone,
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+      }),
+    [preferences.timezone],
+  );
+
+  const allLocalDays = useMemo(() => {
+    const set = new Set<string>();
+    allDays.forEach((day) => {
+      set.add(dayFormatter.format(new Date(`${day}T00:00:00Z`)));
+    });
+    return Array.from(set).sort();
+  }, [allDays, dayFormatter]);
+
+  const summaryByLocalDay = useMemo(() => {
+    const map: Record<string, { summary: DaySummary; utcDay: string }> = {};
+    Object.entries(summaries).forEach(([utcDay, summary]) => {
+      const localDay = dayFormatter.format(new Date(`${utcDay}T00:00:00Z`));
+      map[localDay] = { summary, utcDay };
+    });
+    return map;
+  }, [summaries, dayFormatter]);
+
+  const [viewDate, setViewDate] = useState(() => getDefaultMonth(selectedDay, allLocalDays));
 
   useEffect(() => {
     if (selectedDay) {
@@ -55,25 +83,32 @@ export const MonthlyCalendar = ({ selectedDay, onSelectDay }: MonthlyCalendarPro
     }
   }, [selectedDay]);
 
+  const getLocalDayFromTimestamp = useCallback(
+    (timestamp: string) => dayFormatter.format(new Date(timestamp)),
+    [dayFormatter],
+  );
+
   const mealCounts = useMemo(() => {
     const map: Record<string, number> = {};
     logs.forEach((log) => {
       if (log.category === "food") {
-        map[log.day] = (map[log.day] ?? 0) + 1;
+        const key = getLocalDayFromTimestamp(log.timestamp);
+        map[key] = (map[key] ?? 0) + 1;
       }
     });
     return map;
-  }, [logs]);
+  }, [logs, getLocalDayFromTimestamp]);
 
   const activityMinutes = useMemo(() => {
     const map: Record<string, number> = {};
     logs.forEach((log) => {
       if (log.category === "lifestyle") {
-        map[log.day] = (map[log.day] ?? 0) + 30; // assume 30 minutes per lifestyle entry
+        const key = getLocalDayFromTimestamp(log.timestamp);
+        map[key] = (map[key] ?? 0) + 30; // assume 30 minutes per lifestyle entry
       }
     });
     return map;
-  }, [logs]);
+  }, [logs, getLocalDayFromTimestamp]);
 
   const calendarCells = useMemo(() => {
     const year = viewDate.getUTCFullYear();
@@ -88,7 +123,8 @@ export const MonthlyCalendar = ({ selectedDay, onSelectDay }: MonthlyCalendarPro
         return { key: `placeholder-${index}` };
       }
       const iso = toIsoDay(year, month, dateNumber);
-      const summary = summaries[iso];
+      const summaryBundle = summaryByLocalDay[iso];
+      const summary = summaryBundle?.summary;
       const meals = mealCounts[iso] ?? 0;
       const activity = activityMinutes[iso] ?? 0;
       const dotClass = cn(
@@ -162,27 +198,29 @@ export const MonthlyCalendar = ({ selectedDay, onSelectDay }: MonthlyCalendarPro
             }
 
             const isSelected = selectedDay === cell.iso;
-            const showStar = getAchievement(cell.summary, cell.meals, cell.activity);
-            const title = cell.summary
-              ? `${cell.summary.tir.toFixed(0)}% in range`
-              : "No CGM data";
+            const showStar = getAchievement(summary, cell.meals, cell.activity);
+            const title = summary ? `${summary.tir.toFixed(0)}% in range` : "No CGM data";
 
             const content = (
               <button
                 type="button"
                 onClick={() => onSelectDay(cell.iso!)}
-                className={cn(
-                  "relative flex h-16 flex-col items-center justify-center rounded-2xl border text-sm",
-                  isSelected ? "border-primary/60 bg-primary/5" : "border-border/60 bg-muted/40",
-                  cell.summary ? "hover:border-primary/50" : "opacity-60",
-                )}
+                  className={cn(
+                    "relative flex h-16 flex-col items-center justify-center rounded-2xl border text-sm",
+                    isSelected ? "border-primary/60 bg-primary/5" : "border-border/60 bg-muted/40",
+                    summary ? "hover:border-primary/50" : "opacity-60",
+                  )}
               >
                 <span className="text-sm font-semibold">{cell.label}</span>
                 <span className="mt-1 flex items-center gap-1">
                   <span className={cell.dotClass} />
                   {showStar && <Star className="w-3 h-3 text-primary" />}
                 </span>
-                {isSelected && <span className="absolute inset-x-2 bottom-1 rounded-full bg-primary/10 text-[10px] text-primary">Daily view</span>}
+                {isSelected && (
+                  <span className="absolute inset-x-2 bottom-1 rounded-full bg-primary/10 text-[10px] text-primary">
+                    Daily timeline
+                  </span>
+                )}
               </button>
             );
 
@@ -197,7 +235,7 @@ export const MonthlyCalendar = ({ selectedDay, onSelectDay }: MonthlyCalendarPro
                 <TooltipTrigger asChild>{content}</TooltipTrigger>
                 <TooltipContent className="text-xs">
                   <p className="font-medium">{title}</p>
-                  <p>Avg: {cell.summary ? `${cell.summary.avgGlucose.toFixed(0)} mg/dL` : "--"}</p>
+                  <p>Avg: {summary ? `${summary.avgGlucose.toFixed(0)} mg/dL` : "--"}</p>
                   <p>Meals logged: {cell.meals}</p>
                   <p>Activity minutes: {cell.activity}</p>
                 </TooltipContent>

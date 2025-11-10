@@ -9,16 +9,18 @@ import { ResponsiveContainer, Area, AreaChart, YAxis } from "recharts";
 import { cn } from "@/lib/utils";
 
 interface DayTimelineProps {
-  selectedDay: string | null;
+  dayUtc: string | null;
+  dayLocal?: string | null;
 }
 
 interface TimelineItem {
   id: string;
   label: string;
   description?: string;
-  minutesOfDay: number;
+  minutesOfDayUtc: number;
   kind: "meal" | "activity" | "chat" | "sleep";
   durationMinutes?: number;
+  timestampUtc: string;
 }
 
 const minutesToPercent = (minutes: number) => `${(minutes / 1440) * 100}%`;
@@ -33,9 +35,10 @@ const buildSleepSegments = (day: string) => {
     {
       id: `${day}-sleep`,
       label: "Sleep",
-      minutesOfDay: start,
+      minutesOfDayUtc: start,
       durationMinutes: Math.min(duration, 600),
       kind: "sleep" as const,
+      timestampUtc: buildTimestampUtc(day, start),
     },
   ];
 };
@@ -48,15 +51,17 @@ const buildChatEntries = (day: string) => {
       id: `${day}-chat-1`,
       label: "Butler check-in",
       description: "You reflected on afternoon energy dip.",
-      minutesOfDay: base,
+      minutesOfDayUtc: base,
       kind: "chat" as const,
+      timestampUtc: buildTimestampUtc(day, base),
     },
     {
       id: `${day}-chat-2`,
       label: "Coaching prompt",
       description: "Olivia suggested a gentle walk.",
-      minutesOfDay: Math.min(base + 120, 1320),
+      minutesOfDayUtc: Math.min(base + 120, 1320),
       kind: "chat" as const,
+      timestampUtc: buildTimestampUtc(day, Math.min(base + 120, 1320)),
     },
   ];
 };
@@ -68,26 +73,28 @@ const buildLogItems = (day: string, logs: ReturnType<typeof useActivityLog>["log
       id: log.id,
       label: log.title,
       description: log.note,
-      minutesOfDay: log.minutesOfDayUtc,
+      minutesOfDayUtc: log.minutesOfDayUtc,
       kind: log.category === "food" ? "meal" : "activity",
+      timestampUtc: log.timestamp,
     }));
 };
 
 const prepareTimelineItems = (day: string, logs: ReturnType<typeof useActivityLog>["logs"]) => {
-  const items: TimelineItem[] = [...buildLogItems(day, logs), ...buildSleepSegments(day), ...buildChatEntries(day)];
-  return items.sort((a, b) => a.minutesOfDay - b.minutesOfDay);
+  const items: TimelineItem[] = [
+    ...buildLogItems(day, logs),
+    ...buildSleepSegments(day),
+    ...buildChatEntries(day),
+  ];
+  return items.sort((a, b) => a.minutesOfDayUtc - b.minutesOfDayUtc);
 };
 
-const formatMinutes = (minutes: number, locale: string) => {
-  const clamped = Math.max(0, Math.min(1439, minutes));
-  const date = new Date(Date.UTC(1970, 0, 1, 0, clamped));
-  return new Intl.DateTimeFormat(locale, {
+const formatTimestamp = (iso: string, locale: string, timeZone: string) =>
+  new Intl.DateTimeFormat(locale, {
     hour: "2-digit",
     minute: "2-digit",
     hour12: false,
-    timeZone: "UTC",
-  }).format(date);
-};
+    timeZone,
+  }).format(new Date(iso));
 
 const buildChartData = (points: GlucoseTrendPoint[]) =>
   points.map((point) => ({
@@ -95,20 +102,20 @@ const buildChartData = (points: GlucoseTrendPoint[]) =>
     glucose: point.glucose,
   }));
 
-export const DayTimeline = ({ selectedDay }: DayTimelineProps) => {
+export const DayTimeline = ({ dayUtc, dayLocal }: DayTimelineProps) => {
   const { preferences } = useUserPreferences();
   const { logs } = useActivityLog();
-  const { points, loading } = useGlucoseDaySeries(preferences.locale, selectedDay);
+  const { points, loading } = useGlucoseDaySeries(preferences.locale, dayUtc);
   const { summaries } = useGlucoseCalendarData(preferences.locale);
   const timelineItems = useMemo(() => {
-    if (!selectedDay) return [];
-    return prepareTimelineItems(selectedDay, logs);
-  }, [selectedDay, logs]);
+    if (!dayUtc) return [];
+    return prepareTimelineItems(dayUtc, logs);
+  }, [dayUtc, logs]);
 
   const chartData = useMemo(() => buildChartData(points), [points]);
-  const summary = selectedDay ? summaries[selectedDay] : undefined;
+  const summary = dayUtc ? summaries[dayUtc] : undefined;
 
-  if (!selectedDay) {
+  if (!dayUtc) {
     return (
       <Card className="mx-6 mt-6 p-6 rounded-3xl border-dashed border-border text-muted-foreground">
         Select any day on the calendar to explore how meals, movement, and chats influenced your glucose curve.
@@ -116,14 +123,18 @@ export const DayTimeline = ({ selectedDay }: DayTimelineProps) => {
     );
   }
 
+  const displayDate = dayLocal
+    ? new Date(`${dayLocal}T00:00:00`)
+    : new Date(`${dayUtc}T00:00:00Z`);
+
   return (
     <Card className="mx-6 mt-6 rounded-3xl border-border/60 p-6">
       <div className="flex items-center justify-between mb-4">
         <div>
           <p className="text-xs uppercase tracking-wide text-muted-foreground">Daily view</p>
           <h2 className="text-2xl font-semibold">
-            {new Intl.DateTimeFormat(preferences.locale, { dateStyle: "full" }).format(
-              parseDay(selectedDay),
+            {new Intl.DateTimeFormat(preferences.locale, { dateStyle: "full", timeZone: dayLocal ? preferences.timezone : "UTC" }).format(
+              displayDate,
             )}
           </h2>
         </div>
@@ -167,7 +178,7 @@ export const DayTimeline = ({ selectedDay }: DayTimelineProps) => {
                     key={item.id}
                     className="absolute top-6 flex flex-col items-center"
                     style={{
-                      left: minutesToPercent(item.minutesOfDay),
+                      left: minutesToPercent(item.minutesOfDayUtc),
                       width: minutesToPercent(item.durationMinutes),
                     }}
                   >
@@ -183,17 +194,19 @@ export const DayTimeline = ({ selectedDay }: DayTimelineProps) => {
                 <div
                   key={item.id}
                   className="absolute bottom-4 flex flex-col items-center"
-                  style={{ left: minutesToPercent(item.minutesOfDay) }}
+                  style={{ left: minutesToPercent(item.minutesOfDayUtc) }}
                 >
                   <div className={cn("rounded-2xl px-3 py-2 text-xs shadow-lg", colorClass)}>
                     <div className="flex items-center gap-1 font-semibold">
                       <Icon className="w-3 h-3" />
                       <span>{item.label}</span>
                     </div>
-                    <p className="text-[11px] opacity-80">{item.description ?? formatMinutes(item.minutesOfDay, preferences.locale)}</p>
+                    <p className="text-[11px] opacity-80">
+                      {item.description ?? formatTimestamp(item.timestampUtc, preferences.locale, preferences.timezone)}
+                    </p>
                   </div>
                   <span className="mt-1 text-[10px] text-muted-foreground">
-                    {formatMinutes(item.minutesOfDay, preferences.locale)}
+                    {formatTimestamp(item.timestampUtc, preferences.locale, preferences.timezone)}
                   </span>
                 </div>
               );
@@ -217,7 +230,7 @@ export const DayTimeline = ({ selectedDay }: DayTimelineProps) => {
   );
 };
 
-function parseDay(iso: string) {
-  const [year, month, day] = iso.split("-").map(Number);
-  return new Date(Date.UTC(year, month - 1, day));
+function buildTimestampUtc(day: string, minutes: number) {
+  const base = new Date(`${day}T00:00:00Z`);
+  return new Date(base.getTime() + minutes * 60000).toISOString();
 }

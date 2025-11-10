@@ -100,6 +100,13 @@ export const DayTimeline = ({ selectedDay }: DayTimelineProps) => {
   const { logs } = useActivityLog();
   const { points, loading } = useGlucoseDaySeries(preferences.locale, selectedDay);
   const { summaries } = useGlucoseCalendarData(preferences.locale);
+  const timelineItems = useMemo(() => {
+    if (!selectedDay) return [];
+    return prepareTimelineItems(selectedDay, logs);
+  }, [selectedDay, logs]);
+
+  const chartData = useMemo(() => buildChartData(points), [points]);
+  const summary = selectedDay ? summaries[selectedDay] : undefined;
 
   if (!selectedDay) {
     return (
@@ -108,10 +115,6 @@ export const DayTimeline = ({ selectedDay }: DayTimelineProps) => {
       </Card>
     );
   }
-
-  const timelineItems = useMemo(() => prepareTimelineItems(selectedDay, logs), [selectedDay, logs]);
-  const chartData = useMemo(() => buildChartData(points), [points]);
-  const summary = summaries[selectedDay];
 
   return (
     <Card className="mx-6 mt-6 rounded-3xl border-border/60 p-6">

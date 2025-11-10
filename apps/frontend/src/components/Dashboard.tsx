@@ -41,7 +41,7 @@ export const Dashboard = ({ selectedDay }: DashboardProps) => {
       percentage: percentage.toFixed(1),
       minutes: Math.round(inRangeMinutes),
     };
-  }, [points]);
+  }, [points, stepMinutes]);
 
   const segments = useMemo(() => {
     const buckets = [
@@ -89,7 +89,7 @@ export const Dashboard = ({ selectedDay }: DashboardProps) => {
         status,
       };
     });
-  }, [points]);
+  }, [points, stepMinutes]);
 
   return (
     <section className="px-6 py-8 bg-muted/40">

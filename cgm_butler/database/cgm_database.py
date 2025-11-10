@@ -92,10 +92,18 @@ class CGMDatabase:
         if not timestamp_str:
             raise ValueError("timestamp is required")
 
-        cleaned = timestamp_str.replace("Z", "+00:00")
+        cleaned = timestamp_str.strip()
+        if not cleaned:
+            raise ValueError("timestamp is required")
+
+        cleaned = cleaned.replace("Z", "+00:00")
         dt = datetime.fromisoformat(cleaned)
-        dt_utc = dt.astimezone(timezone.utc)
-        timestamp_utc = dt_utc.isoformat().replace("+00:00", "Z")
+        if dt.tzinfo is None:
+            dt_utc = dt.replace(tzinfo=timezone.utc)
+        else:
+            dt_utc = dt.astimezone(timezone.utc)
+
+        timestamp_utc = dt_utc.isoformat(timespec='milliseconds').replace("+00:00", "")
         day = dt_utc.date().isoformat()
         minutes = dt_utc.hour * 60 + dt_utc.minute
         return timestamp_utc, day, minutes

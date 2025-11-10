@@ -58,17 +58,26 @@ export const ActivityLogButton = () => {
     setDose("");
   };
 
+  const formatTimestampForBackend = (input: string) => {
+    const parsed = new Date(input);
+    if (Number.isNaN(parsed.getTime())) {
+      return new Date().toISOString().replace("Z", "");
+    }
+    return parsed.toISOString().replace("Z", "");
+  };
+
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (isSubmitDisabled || isSubmitting) return;
 
     setIsSubmitting(true);
     try {
+      const timestampUtc = formatTimestampForBackend(timestamp);
       await addLog({
         title: title.trim(),
         category: category === "food" ? "food" : category === "lifestyle" ? "lifestyle" : "medication",
         note: note.trim() || undefined,
-        timestamp: new Date(timestamp).toISOString(),
+        timestamp: timestampUtc,
         medicationName: isMedication ? medicationName.trim() : undefined,
         dose: isMedication ? dose.trim() || undefined : undefined,
       });

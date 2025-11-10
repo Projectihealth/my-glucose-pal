@@ -27,6 +27,7 @@ interface ActivityLogContextValue {
 const ActivityLogContext = createContext<ActivityLogContextValue | undefined>(undefined);
 
 const API_BASE = (import.meta.env.VITE_BACKEND_URL ?? "").replace(/\/$/, "");
+const OFFLINE_STORAGE_KEY = "activity-log-offline";
 
 const getCurrentUserId = () => {
   if (typeof window === "undefined") return "user_001";
@@ -70,12 +71,61 @@ const buildLogsEndpoint = (userId: string) => {
   return `${API_BASE}/api/activity-logs/${encodeURIComponent(userId)}?${params.toString()}`;
 };
 
+const generateId = () => {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID();
+  }
+  return Math.random().toString(36).slice(2, 10);
+};
+
+const parseTimestamp = (timestamp: string) => {
+  const date = new Date(timestamp);
+  if (Number.isNaN(date.getTime())) {
+    const now = new Date();
+    return {
+      iso: now.toISOString(),
+      day: now.toISOString().slice(0, 10),
+      minutes: now.getUTCHours() * 60 + now.getUTCMinutes(),
+    };
+  }
+
+  return {
+    iso: date.toISOString(),
+    day: date.toISOString().slice(0, 10),
+    minutes: date.getUTCHours() * 60 + date.getUTCMinutes(),
+  };
+};
+
+const loadOfflineLogs = (): ActivityLogEntry[] => {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = window.localStorage.getItem(OFFLINE_STORAGE_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed as ActivityLogEntry[];
+  } catch (error) {
+    console.warn("Unable to parse offline activity logs", error);
+    return [];
+  }
+};
+
+const persistOfflineLogs = (entries: ActivityLogEntry[]) => {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(OFFLINE_STORAGE_KEY, JSON.stringify(entries));
+  } catch (error) {
+    console.warn("Unable to persist offline activity logs", error);
+  }
+};
+
 interface ActivityLogProviderProps {
   children: ReactNode;
 }
 
 export const ActivityLogProvider = ({ children }: ActivityLogProviderProps) => {
-  const [logs, setLogs] = useState<ActivityLogEntry[]>([]);
+  const [remoteLogs, setRemoteLogs] = useState<ActivityLogEntry[]>([]);
+  const [offlineLogs, setOfflineLogs] = useState<ActivityLogEntry[]>(() => loadOfflineLogs());
   const [isLoading, setIsLoading] = useState(false);
   const [userId, setUserId] = useState(() => getCurrentUserId());
 
@@ -97,7 +147,7 @@ export const ActivityLogProvider = ({ children }: ActivityLogProviderProps) => {
 
     const loadLogs = async () => {
       if (!API_BASE) {
-        setLogs([]);
+        setRemoteLogs([]);
         return;
       }
 
@@ -110,12 +160,12 @@ export const ActivityLogProvider = ({ children }: ActivityLogProviderProps) => {
         }
         const payload = (await response.json()) as ActivityLogApiRow[];
         if (!cancelled) {
-          setLogs(payload.map(mapApiLogToEntry));
+          setRemoteLogs(payload.map(mapApiLogToEntry));
         }
       } catch (error) {
         if (!cancelled) {
           console.warn("Unable to load activity logs", error);
-          setLogs([]);
+          setRemoteLogs([]);
         }
       } finally {
         if (!cancelled) {
@@ -133,11 +183,44 @@ export const ActivityLogProvider = ({ children }: ActivityLogProviderProps) => {
     };
   }, [userId]);
 
+  useEffect(() => {
+    const handleStorage = (event: StorageEvent) => {
+      if (event.key === OFFLINE_STORAGE_KEY) {
+        setOfflineLogs(loadOfflineLogs());
+      }
+    };
+
+    if (typeof window !== "undefined") {
+      window.addEventListener("storage", handleStorage);
+      return () => window.removeEventListener("storage", handleStorage);
+    }
+  }, []);
+
+  const addOfflineLog = useCallback((entry: ActivityLogInput): ActivityLogEntry => {
+    const { iso, day, minutes } = parseTimestamp(entry.timestamp);
+    const offlineEntry: ActivityLogEntry = {
+      ...entry,
+      id: generateId(),
+      timestamp: iso,
+      day,
+      minutesOfDayUtc: minutes,
+      medicationName: entry.category === "medication" ? entry.medicationName : undefined,
+      dose: entry.category === "medication" ? entry.dose : undefined,
+      createdAt: new Date().toISOString(),
+    };
+    setOfflineLogs((prev) => {
+      const next = [offlineEntry, ...prev];
+      persistOfflineLogs(next);
+      return next;
+    });
+    return offlineEntry;
+  }, []);
+
   const addLog = useCallback(
     async (entry: ActivityLogInput): Promise<ActivityLogEntry | null> => {
       if (!API_BASE) {
-        console.warn("Activity log API base URL is not configured");
-        return null;
+        console.warn("Activity log API base URL is not configured. Saving locally.");
+        return addOfflineLog(entry);
       }
 
       const payload = {
@@ -150,25 +233,36 @@ export const ActivityLogProvider = ({ children }: ActivityLogProviderProps) => {
         dose: entry.category === "medication" ? entry.dose ?? null : null,
       };
 
-      const response = await fetch(`${API_BASE}/api/activity-logs`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(payload),
-      });
+      try {
+        const response = await fetch(`${API_BASE}/api/activity-logs`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(payload),
+        });
 
-      if (!response.ok) {
-        const errorMessage = await response.text();
-        throw new Error(errorMessage || "Failed to create activity log");
+        if (!response.ok) {
+          const errorMessage = await response.text();
+          throw new Error(errorMessage || "Failed to create activity log");
+        }
+
+        const created = mapApiLogToEntry((await response.json()) as ActivityLogApiRow);
+        setRemoteLogs((prev) => [created, ...prev]);
+        return created;
+      } catch (error) {
+        console.warn("Falling back to offline log entry", error);
+        return addOfflineLog(entry);
       }
-
-      const created = mapApiLogToEntry((await response.json()) as ActivityLogApiRow);
-      setLogs((prev) => [created, ...prev]);
-      return created;
     },
-    [userId],
+    [userId, addOfflineLog],
   );
+
+  const logs = useMemo(() => {
+    const merged = [...offlineLogs, ...remoteLogs];
+    merged.sort((a, b) => (a.timestamp < b.timestamp ? 1 : -1));
+    return merged;
+  }, [offlineLogs, remoteLogs]);
 
   const value = useMemo(
     () => ({

@@ -12,6 +12,15 @@ interface RawTrendPoint {
   value: number | null;
 }
 
+export interface DaySummary {
+  day: string;
+  tir: number;
+  avgGlucose: number;
+  timeInRangeMinutes: number;
+  totalMinutes: number;
+  readings: number;
+}
+
 const UPDATE_INTERVAL_MINUTES = 5;
 const DEFAULT_INTERVAL_MS = UPDATE_INTERVAL_MINUTES * 60 * 1000;
 const INITIAL_DAY_COUNT = 288; // number of readings shown immediately per day
@@ -48,37 +57,45 @@ const convertReading = (reading: RawTrendPoint, locale: string) => {
   };
 };
 
-export const useGlucoseTrend = (
-  locale: string,
-  timeZone: string,
-  selectedDay?: string | null,
-) => {
-  const [rawData, setRawData] = useState<RawTrendPoint[]>([]);
-  const [loading, setLoading] = useState(true);
+let cachedRawData: RawTrendPoint[] | null = null;
+let rawDataPromise: Promise<RawTrendPoint[]> | null = null;
+
+const fetchGlucoseDataset = async (): Promise<RawTrendPoint[]> => {
+  const response = await fetch(`${import.meta.env.BASE_URL}data/glucose_trend.json`, {
+    cache: "no-store",
+  });
+  if (!response.ok) throw new Error(`Failed to load trend data (${response.status})`);
+  const payload = await response.json();
+  return (Array.isArray(payload) ? payload : payload?.data?.rawData ?? []) as RawTrendPoint[];
+};
+
+const useGlucoseDayMap = (locale: string) => {
+  const [rawData, setRawData] = useState<RawTrendPoint[]>(cachedRawData ?? []);
+  const [loading, setLoading] = useState(!cachedRawData);
   const [error, setError] = useState<string | null>(null);
-  const [displayedPoints, setDisplayedPoints] = useState<GlucoseTrendPoint[]>([]);
-  const [resolvedDay, setResolvedDay] = useState<string | null>(null);
-  const [updateIntervalMs, setUpdateIntervalMs] = useState(DEFAULT_INTERVAL_MS);
 
   useEffect(() => {
     let cancelled = false;
+    if (cachedRawData) {
+      setRawData(cachedRawData);
+      setLoading(false);
+      return () => {
+        cancelled = true;
+      };
+    }
 
-    const load = async () => {
+    const hydrate = async () => {
       try {
         setLoading(true);
         setError(null);
-        const response = await fetch(`${import.meta.env.BASE_URL}data/glucose_trend.json`, {
-          cache: "no-store",
-        });
-        if (!response.ok) throw new Error(`Failed to load trend data (${response.status})`);
-        const payload = await response.json();
-        const dataArray = Array.isArray(payload)
-          ? payload
-          : payload?.data?.rawData ?? [];
-        if (!cancelled) setRawData(dataArray as RawTrendPoint[]);
+        rawDataPromise = rawDataPromise ?? fetchGlucoseDataset();
+        const data = await rawDataPromise;
+        if (cancelled) return;
+        cachedRawData = data;
+        setRawData(data);
       } catch (err) {
         if (cancelled) return;
-        console.warn("Unable to load glucose trend data", err);
+        rawDataPromise = null;
         setError((err as Error).message);
         setRawData([]);
       } finally {
@@ -86,7 +103,7 @@ export const useGlucoseTrend = (
       }
     };
 
-    void load();
+    void hydrate();
 
     return () => {
       cancelled = true;
@@ -110,6 +127,19 @@ export const useGlucoseTrend = (
 
     return map;
   }, [rawData, locale]);
+
+  return { dayMap, loading, error } as const;
+};
+
+export const useGlucoseTrend = (
+  locale: string,
+  timeZone: string,
+  selectedDay?: string | null,
+) => {
+  const { dayMap, loading, error } = useGlucoseDayMap(locale);
+  const [displayedPoints, setDisplayedPoints] = useState<GlucoseTrendPoint[]>([]);
+  const [resolvedDay, setResolvedDay] = useState<string | null>(null);
+  const [updateIntervalMs, setUpdateIntervalMs] = useState(DEFAULT_INTERVAL_MS);
 
   const availableDays = useMemo(() => {
     const days = Object.keys(dayMap).sort();
@@ -190,5 +220,83 @@ export const useGlucoseTrend = (
     availableDays,
     resolvedDay,
     updateIntervalMinutes: updateIntervalMs / 60000,
+    dayMap,
   };
+};
+
+const summarizeDay = (points: GlucoseTrendPoint[]) => {
+  if (!points.length) {
+    return {
+      tir: 0,
+      avgGlucose: 0,
+      timeInRangeMinutes: 0,
+      totalMinutes: 0,
+      readings: 0,
+    };
+  }
+
+  let totalMinutes = 0;
+  let timeInRange = 0;
+  let glucoseSum = 0;
+
+  for (let i = 0; i < points.length; i += 1) {
+    const current = points[i];
+    const next = points[i + 1];
+    const delta = next
+      ? Math.max(1, (next.timestamp - current.timestamp) / 60000)
+      : UPDATE_INTERVAL_MINUTES;
+    totalMinutes += delta;
+    if (current.glucose >= 70 && current.glucose <= 140) {
+      timeInRange += delta;
+    }
+    glucoseSum += current.glucose;
+  }
+
+  return {
+    tir: totalMinutes ? (timeInRange / totalMinutes) * 100 : 0,
+    avgGlucose: glucoseSum / points.length,
+    timeInRangeMinutes: timeInRange,
+    totalMinutes,
+    readings: points.length,
+  };
+};
+
+export const useGlucoseCalendarData = (locale: string) => {
+  const { dayMap, loading, error } = useGlucoseDayMap(locale);
+
+  const summaries = useMemo<Record<string, DaySummary>>(() => {
+    const map: Record<string, DaySummary> = {};
+    Object.entries(dayMap).forEach(([day, points]) => {
+      const daily = summarizeDay(points);
+      map[day] = {
+        day,
+        tir: daily.tir,
+        avgGlucose: daily.avgGlucose,
+        timeInRangeMinutes: daily.timeInRangeMinutes,
+        totalMinutes: daily.totalMinutes,
+        readings: daily.readings,
+      };
+    });
+    return map;
+  }, [dayMap]);
+
+  const allDays = useMemo(() => Object.keys(dayMap).sort(), [dayMap]);
+
+  return {
+    summaries,
+    allDays,
+    loading,
+    error,
+  } as const;
+};
+
+export const useGlucoseDaySeries = (locale: string, day: string | null) => {
+  const { dayMap, loading, error } = useGlucoseDayMap(locale);
+  const series = day && dayMap[day] ? dayMap[day] : [];
+
+  return {
+    points: series,
+    loading,
+    error,
+  } as const;
 };

@@ -35,8 +35,14 @@ export function MobileCallInterface({ onBack, onCallEnded }: MobileCallInterface
     if (transcript.length > 0) {
       const lastMessage = transcript[transcript.length - 1];
       setCurrentText(lastMessage.content);
+      console.log('[MobileCallInterface] Updated text:', lastMessage.content.substring(0, 50) + '...');
     }
   }, [transcript]);
+
+  // Debug: Log isAgentSpeaking changes
+  useEffect(() => {
+    console.log('[MobileCallInterface] isAgentSpeaking changed:', isAgentSpeaking);
+  }, [isAgentSpeaking]);
 
   // Handle call end
   const handleEndCall = async () => {

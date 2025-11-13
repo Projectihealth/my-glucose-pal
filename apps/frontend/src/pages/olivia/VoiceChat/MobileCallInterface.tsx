@@ -165,7 +165,7 @@ export function MobileCallInterface({ onBack, onCallEnded }: MobileCallInterface
             <div className={`w-20 h-20 rounded-full bg-gradient-to-br shadow-2xl flex items-center justify-center transition-all ${
               isMuted 
                 ? 'from-gray-400 to-gray-500 shadow-gray-400/50' 
-                : 'from-[#5B7FF3] to-[#7B5FFF] shadow-[#5B7FF3]/50'
+                : 'from-[#5B7FF3] to-[#4A6FE3] shadow-[#5B7FF3]/50'
             }`}>
               {isMuted ? (
                 <MicOff className="w-9 h-9 text-white" />

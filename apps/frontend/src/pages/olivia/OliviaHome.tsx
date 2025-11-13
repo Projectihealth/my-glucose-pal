@@ -15,10 +15,17 @@ function OliviaTab({ onNavigate }: { onNavigate: (view: 'text' | 'voice' | 'vide
   return (
     <div className="p-6 space-y-6">
       {/* Header */}
-      <div className="text-center space-y-3 pt-8">
-        <h1 className="text-gray-800 text-2xl">Talk with Olivia</h1>
-        <p className="text-gray-500">
-          Connect with your AI health companion
+      <div className="text-left space-y-4 pt-8 pb-4">
+        <div className="space-y-2">
+          <p className="text-[#5B7FF3] text-xs font-semibold tracking-[0.15em] uppercase">
+            OLIVIA
+          </p>
+          <h1 className="text-gray-900 text-4xl font-bold leading-tight">
+            Talk with your AI health companion
+          </h1>
+        </div>
+        <p className="text-gray-600 text-lg leading-relaxed">
+          Connect with Olivia through voice or video for personalized health guidance.
         </p>
       </div>
 

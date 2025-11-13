@@ -16,6 +16,10 @@ import OliviaOverview from "./pages/articles/OliviaOverview";
 import CgmFoundations from "./pages/articles/CgmFoundations";
 import NutritionPlaybook from "./pages/articles/NutritionPlaybook";
 import NotFound from "./pages/NotFound";
+import OliviaHome from "./pages/olivia/OliviaHome";
+import VoiceChat from "./pages/olivia/VoiceChat";
+import VideoChat from "./pages/olivia/VideoChat";
+import TextChat from "./pages/olivia/TextChat";
 
 const queryClient = new QueryClient();
 
@@ -31,7 +35,10 @@ const App = () => (
               <Routes>
                 <Route path="/" element={<Landing />} />
                 <Route path="/overview" element={<Overview />} />
-                <Route path="/coach" element={<Coach />} />
+                <Route path="/coach" element={<OliviaHome />} />
+                <Route path="/coach/voice" element={<VoiceChat />} />
+                <Route path="/coach/video" element={<VideoChat />} />
+                <Route path="/coach/text" element={<TextChat />} />
               <Route path="/learn-more" element={<LearnMore />} />
               <Route path="/learn-more/olivia" element={<OliviaOverview />} />
               <Route path="/learn-more/cgm-foundations" element={<CgmFoundations />} />

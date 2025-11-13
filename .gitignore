@@ -28,3 +28,22 @@ dist-ssr
 
 # Python
 venv/
+
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Database files
+*.db
+*.db-journal
+*.sqlite
+*.sqlite3
+
+# Process IDs
+.pids/
+
+# Backups
+*.backup
+*.bak
+

@@ -15,18 +15,20 @@ from .cgm_tools import CGMTools, FUNCTION_DEFINITIONS
 
 class ConversationManager:
     """Manages conversations with the digital avatar."""
-    
-    def __init__(self, tavus_api_key: Optional[str] = None, persona_id: str = "p754b367b5f0"):
+
+    def __init__(self, tavus_api_key: Optional[str] = None, persona_id: str = "p754b367b5f0", replica_id: str = "r9fa0878977a"):
         """
         Initialize conversation manager.
-        
+
         Args:
             tavus_api_key: Tavus API key
             persona_id: Digital avatar persona ID
+            replica_id: Digital avatar replica ID
         """
         self.tavus_client = TavusClient(api_key=tavus_api_key)
         self.cgm_tools = CGMTools()
         self.persona_id = persona_id
+        self.replica_id = replica_id
         self.active_conversations = {}  # conversation_id -> user_id mapping
     
     def start_conversation(self, user_id: str, config: Optional[Dict] = None) -> Dict[str, Any]:
@@ -42,27 +44,33 @@ class ConversationManager:
         """
         # Get user info to personalize the conversation
         user_info = self.cgm_tools.get_user_info(user_id)
-        
-        # Default configuration
-        default_config = {
-            "context": f"You are a helpful CGM (Continuous Glucose Monitoring) health assistant. "
-                      f"You are talking to {user_info.get('name', 'the user')}. "
-                      f"Their health goal is: {user_info.get('health_goal', 'manage glucose levels')}. "
-                      f"They have: {user_info.get('conditions', 'no specific conditions')}. "
-                      f"Be empathetic, supportive, and provide actionable advice based on their CGM data. "
-                      f"You have access to tools to retrieve their glucose readings, patterns, and recommendations.",
-            "tools": FUNCTION_DEFINITIONS,
-            "language": "en"
+
+        # Build conversational context
+        conversational_context = (
+            f"You are a helpful CGM (Continuous Glucose Monitoring) health assistant. "
+            f"You are talking to {user_info.get('name', 'the user')}. "
+            f"Their health goal is: {user_info.get('health_goal', 'manage glucose levels')}. "
+            f"They have: {user_info.get('conditions', 'no specific conditions')}. "
+            f"Be empathetic, supportive, and provide actionable advice based on their CGM data."
+        )
+
+        # Build custom greeting
+        custom_greeting = f"Hello {user_info.get('name', 'there')}! I'm your CGM health assistant. How can I help you today?"
+
+        # Properties
+        properties = {
+            "language": config.get("language", "english") if config else "english",
+            "max_call_duration": 3600,
+            "enable_recording": False
         }
-        
-        # Merge with custom config
-        if config:
-            default_config.update(config)
-        
+
         # Create conversation via Tavus API
         conversation = self.tavus_client.create_conversation(
+            replica_id=self.replica_id,
             persona_id=self.persona_id,
-            config=default_config
+            conversational_context=conversational_context,
+            custom_greeting=custom_greeting,
+            properties=properties
         )
         
         # Store conversation mapping

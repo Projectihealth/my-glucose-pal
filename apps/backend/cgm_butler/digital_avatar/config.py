@@ -21,6 +21,7 @@ except ImportError:
 # API Keys - 仅从环境变量读取，不要硬编码敏感信息！
 TAVUS_API_KEY = os.getenv('TAVUS_API_KEY', '')
 TAVUS_PERSONA_ID = os.getenv('TAVUS_PERSONA_ID', 'p176d7357a2d')
+TAVUS_REPLICA_ID = os.getenv('TAVUS_REPLICA_ID', 'r9fa0878977a')
 OPENAI_API_KEY = os.getenv('OPENAI_API_KEY', '')
 
 
@@ -30,6 +31,7 @@ class AvatarConfig:
     # Tavus API Configuration
     TAVUS_API_KEY: str = TAVUS_API_KEY
     TAVUS_PERSONA_ID: str = TAVUS_PERSONA_ID
+    TAVUS_REPLICA_ID: str = TAVUS_REPLICA_ID
     
     # OpenAI API Configuration
     OPENAI_API_KEY: str = OPENAI_API_KEY

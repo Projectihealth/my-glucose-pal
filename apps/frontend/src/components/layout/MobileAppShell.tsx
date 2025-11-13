@@ -59,11 +59,14 @@ export const MobileAppShell = ({ children, className }: MobileAppShellProps) => 
         style={{ height: "min(812px, calc(100vh - 2rem))" }}
       >
         <div className="absolute inset-x-16 top-0 h-7 rounded-b-[20px] bg-slate-900/90 dark:bg-slate-700/70" aria-hidden="true" />
-        <div className="pointer-events-none absolute inset-x-0 bottom-[88px] flex justify-center z-30">
-          <div className="pointer-events-auto">
-            <ActivityLogButton />
+        {/* Hide Activity Log button on Olivia chat pages */}
+        {!location.pathname.startsWith('/coach/') && (
+          <div className="pointer-events-none absolute inset-x-0 bottom-[88px] flex justify-center z-30">
+            <div className="pointer-events-auto">
+              <ActivityLogButton />
+            </div>
           </div>
-        </div>
+        )}
 
         <div className="flex flex-col h-full">
           <header className="flex items-center justify-between px-7 pt-6 pb-4 text-[13px] font-semibold text-slate-500">
@@ -75,7 +78,7 @@ export const MobileAppShell = ({ children, className }: MobileAppShellProps) => 
             </div>
           </header>
 
-          <main className={cn("flex-1 overflow-y-auto pb-28", className)}>
+          <main className={cn("flex-1 overflow-y-auto pb-28 relative", className)}>
             {children}
           </main>
 

@@ -24,23 +24,25 @@ conversation_manager = None
 gpt_chat_manager = None
 
 
-def init_avatar_api(tavus_api_key: str = None, persona_id: str = None, openai_api_key: str = None):
+def init_avatar_api(tavus_api_key: str = None, persona_id: str = None, replica_id: str = None, openai_api_key: str = None):
     """
     Initialize the avatar API.
-    
+
     Args:
         tavus_api_key: Tavus API key (optional, video avatar won't work without it)
         persona_id: Persona ID
+        replica_id: Replica ID
         openai_api_key: OpenAI API key
     """
     global conversation_manager, gpt_chat_manager
-    
+
     # Tavus conversation manager (for video avatar) - optional, will fail gracefully
     try:
         if tavus_api_key or os.getenv('TAVUS_API_KEY'):
             conversation_manager = ConversationManager(
                 tavus_api_key=tavus_api_key,
-                persona_id=persona_id or AvatarConfig.TAVUS_PERSONA_ID
+                persona_id=persona_id or AvatarConfig.TAVUS_PERSONA_ID,
+                replica_id=replica_id or AvatarConfig.TAVUS_REPLICA_ID
             )
             print("✅ Tavus API initialized successfully (video avatar available)")
         else:

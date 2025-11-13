@@ -1,11 +1,9 @@
 import { useMemo } from "react";
 import { Card } from "@/components/ui/card";
-import { Apple, Activity, MessageCircle, Moon } from "lucide-react";
+import { Brain, Dumbbell, Moon, UtensilsCrossed } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import { useUserPreferences } from "@/context/UserPreferencesContext";
 import { useActivityLog } from "@/context/ActivityLogContext";
-import { useGlucoseCalendarData, useGlucoseDaySeries } from "@/hooks/useGlucoseTrend";
-import type { GlucoseTrendPoint } from "@/hooks/useGlucoseTrend";
-import { ResponsiveContainer, Area, AreaChart, YAxis } from "recharts";
 import { cn } from "@/lib/utils";
 
 interface DayTimelineProps {
@@ -13,78 +11,36 @@ interface DayTimelineProps {
   dayLocal?: string | null;
 }
 
+type TimelineKind = "meal" | "activity" | "sleep" | "stress";
+
 interface TimelineItem {
   id: string;
   label: string;
   description?: string;
   minutesOfDayUtc: number;
-  kind: "meal" | "activity" | "chat" | "sleep";
-  durationMinutes?: number;
+  kind: TimelineKind;
   timestampUtc: string;
 }
 
-const minutesToPercent = (minutes: number) => `${(minutes / 1440) * 100}%`;
-
-const hashDay = (day: string) => day.split("").reduce((acc, char) => acc + char.charCodeAt(0), 0);
-
-const buildSleepSegments = (day: string) => {
-  const hash = hashDay(day);
-  const start = 30 + (hash % 60);
-  const duration = 360 + (hash % 90);
-  return [
-    {
-      id: `${day}-sleep`,
-      label: "Sleep",
-      minutesOfDayUtc: start,
-      durationMinutes: Math.min(duration, 600),
-      kind: "sleep" as const,
-      timestampUtc: buildTimestampUtc(day, start),
-    },
-  ];
-};
-
-const buildChatEntries = (day: string) => {
-  const hash = hashDay(day);
-  const base = (hash % 600) + 480; // between 8am-6pm
-  return [
-    {
-      id: `${day}-chat-1`,
-      label: "Butler check-in",
-      description: "You reflected on afternoon energy dip.",
-      minutesOfDayUtc: base,
-      kind: "chat" as const,
-      timestampUtc: buildTimestampUtc(day, base),
-    },
-    {
-      id: `${day}-chat-2`,
-      label: "Coaching prompt",
-      description: "Olivia suggested a gentle walk.",
-      minutesOfDayUtc: Math.min(base + 120, 1320),
-      kind: "chat" as const,
-      timestampUtc: buildTimestampUtc(day, Math.min(base + 120, 1320)),
-    },
-  ];
-};
-
 const buildLogItems = (day: string, logs: ReturnType<typeof useActivityLog>["logs"]) => {
-  return logs
-    .filter((log) => log.day === day)
-    .map((log) => ({
-      id: log.id,
-      label: log.title,
-      description: log.note,
-      minutesOfDayUtc: log.minutesOfDayUtc,
-      kind: log.category === "food" ? "meal" : "activity",
-      timestampUtc: log.timestamp,
-    }));
+  console.log('[DayTimeline] buildLogItems called:', { day, totalLogs: logs.length });
+  console.log('[DayTimeline] All log days:', logs.map(l => ({ id: l.id, day: l.day, title: l.title, timestamp: l.timestamp })));
+
+  const filtered = logs.filter((log) => log.day === day);
+  console.log('[DayTimeline] Filtered logs for day:', { day, filteredCount: filtered.length, filtered });
+
+  return filtered.map((log) => ({
+    id: log.id,
+    label: log.title,
+    description: log.note,
+    minutesOfDayUtc: log.minutesOfDayUtc,
+    kind: mapCategoryToKind(log.category as string),
+    timestampUtc: log.timestamp,
+  }));
 };
 
 const prepareTimelineItems = (day: string, logs: ReturnType<typeof useActivityLog>["logs"]) => {
-  const items: TimelineItem[] = [
-    ...buildLogItems(day, logs),
-    ...buildSleepSegments(day),
-    ...buildChatEntries(day),
-  ];
+  const items: TimelineItem[] = buildLogItems(day, logs);
   return items.sort((a, b) => a.minutesOfDayUtc - b.minutesOfDayUtc);
 };
 
@@ -96,29 +52,58 @@ const formatTimestamp = (iso: string, locale: string, timeZone: string) =>
     timeZone,
   }).format(new Date(iso));
 
-const buildChartData = (points: GlucoseTrendPoint[]) =>
-  points.map((point) => ({
-    minutes: point.minutesOfDayUtc,
-    glucose: point.glucose,
-  }));
+const mapCategoryToKind = (category: string): TimelineKind => {
+  switch (category) {
+    case "food":
+      return "meal";
+    case "lifestyle":
+      return "activity";
+    case "medication":
+      return "activity";
+    case "sleep":
+      return "sleep";
+    case "stress":
+      return "stress";
+    default:
+      return "activity";
+  }
+};
+
+const KIND_CONFIG: Record<TimelineKind, { label: string; icon: LucideIcon; badgeClass: string }> = {
+  meal: {
+    label: "Meal",
+    icon: UtensilsCrossed,
+    badgeClass: "bg-amber-100 text-amber-900",
+  },
+  activity: {
+    label: "Activity",
+    icon: Dumbbell,
+    badgeClass: "bg-emerald-100 text-emerald-900",
+  },
+  sleep: {
+    label: "Sleep",
+    icon: Moon,
+    badgeClass: "bg-slate-900 text-white",
+  },
+  stress: {
+    label: "Stress",
+    icon: Brain,
+    badgeClass: "bg-rose-100 text-rose-900",
+  },
+};
 
 export const DayTimeline = ({ dayUtc, dayLocal }: DayTimelineProps) => {
   const { preferences } = useUserPreferences();
   const { logs } = useActivityLog();
-  const { points, loading } = useGlucoseDaySeries(preferences.locale, dayUtc);
-  const { summaries } = useGlucoseCalendarData(preferences.locale);
   const timelineItems = useMemo(() => {
     if (!dayUtc) return [];
     return prepareTimelineItems(dayUtc, logs);
   }, [dayUtc, logs]);
 
-  const chartData = useMemo(() => buildChartData(points), [points]);
-  const summary = dayUtc ? summaries[dayUtc] : undefined;
-
   if (!dayUtc) {
     return (
       <Card className="mx-6 mt-6 p-6 rounded-3xl border-dashed border-border text-muted-foreground">
-        Select any day on the calendar to explore how meals, movement, and chats influenced your glucose curve.
+        Select any day on the calendar to review the meals, activities, sleep, or stress notes logged for that date.
       </Card>
     );
   }
@@ -139,98 +124,78 @@ export const DayTimeline = ({ dayUtc, dayLocal }: DayTimelineProps) => {
           </h2>
         </div>
         <div className="text-sm text-muted-foreground">
-          Avg {summary ? summary.avgGlucose.toFixed(0) : "--"} mg/dL · {timelineItems.length} moments
+          {timelineItems.length ? `${timelineItems.length} logs recorded` : "No logs yet"}
         </div>
       </div>
 
-      <div className="relative h-64 rounded-3xl border border-border/60 bg-background/80">
-        <div className="absolute inset-0 opacity-40 pointer-events-none">
-          <ResponsiveContainer>
-            <AreaChart data={chartData} margin={{ top: 20, right: 20, left: 20, bottom: 0 }}>
-              <YAxis hide domain={[60, 200]} />
-              <Area type="monotone" dataKey="glucose" stroke="hsl(var(--primary))" fill="url(#timelineArea)" strokeWidth={2} />
-              <defs>
-                <linearGradient id="timelineArea" x1="0" x2="0" y1="0" y2="1">
-                  <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.25} />
-                  <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0} />
-                </linearGradient>
-              </defs>
-            </AreaChart>
-          </ResponsiveContainer>
-        </div>
-
-        <div className="absolute inset-0 px-4">
-          <div className="relative h-full">
-            {timelineItems.map((item) => {
-              const Icon = item.kind === "meal" ? Apple : item.kind === "activity" ? Activity : item.kind === "chat" ? MessageCircle : Moon;
-              const colorClass =
-                item.kind === "meal"
-                  ? "bg-amber-100 text-amber-900"
-                  : item.kind === "activity"
-                    ? "bg-emerald-100 text-emerald-900"
-                    : item.kind === "chat"
-                      ? "bg-sky-100 text-sky-900"
-                      : "bg-slate-800/80 text-white";
-
-              if (item.kind === "sleep" && item.durationMinutes) {
-                return (
-                  <div
-                    key={item.id}
-                    className="absolute top-6 flex flex-col items-center"
-                    style={{
-                      left: minutesToPercent(item.minutesOfDayUtc),
-                      width: minutesToPercent(item.durationMinutes),
-                    }}
-                  >
-                    <div className="h-8 w-full rounded-xl bg-slate-900/70 text-white text-xs flex items-center justify-center gap-1">
-                      <Moon className="w-3 h-3" />
-                      <span>Sleep</span>
-                    </div>
-                  </div>
-                );
-              }
-
-              return (
-                <div
-                  key={item.id}
-                  className="absolute bottom-4 flex flex-col items-center"
-                  style={{ left: minutesToPercent(item.minutesOfDayUtc) }}
-                >
-                  <div className={cn("rounded-2xl px-3 py-2 text-xs shadow-lg", colorClass)}>
-                    <div className="flex items-center gap-1 font-semibold">
-                      <Icon className="w-3 h-3" />
-                      <span>{item.label}</span>
-                    </div>
-                    <p className="text-[11px] opacity-80">
-                      {item.description ?? formatTimestamp(item.timestampUtc, preferences.locale, preferences.timezone)}
-                    </p>
-                  </div>
-                  <span className="mt-1 text-[10px] text-muted-foreground">
-                    {formatTimestamp(item.timestampUtc, preferences.locale, preferences.timezone)}
-                  </span>
+      <div className="grid grid-cols-2 gap-3 mb-5">
+        {(Object.keys(KIND_CONFIG) as TimelineKind[]).map((kind) => {
+          const config = KIND_CONFIG[kind];
+          const count = timelineItems.filter((item) => item.kind === kind).length;
+          return (
+            <div
+              key={kind}
+              className={cn(
+                "rounded-2xl border border-border/70 bg-muted/30 p-3 text-sm flex items-center justify-between",
+                count === 0 && "opacity-50",
+              )}
+            >
+              <div className="flex items-center gap-2">
+                <span className={cn("inline-flex h-8 w-8 items-center justify-center rounded-xl", config.badgeClass)}>
+                  <config.icon className="w-4 h-4" />
+                </span>
+                <div>
+                  <p className="font-semibold">{config.label}</p>
+                  <p className="text-xs text-muted-foreground">{count ? `${count} log${count > 1 ? "s" : ""}` : "No logs"}</p>
                 </div>
-              );
-            })}
-
-            <div className="absolute inset-x-0 bottom-0 flex justify-between text-[10px] text-muted-foreground px-2 pb-1">
-              <span>00:00</span>
-              <span>06:00</span>
-              <span>12:00</span>
-              <span>18:00</span>
-              <span>24:00</span>
+              </div>
+              <span className="text-xs text-muted-foreground">{count ? "Tracked" : "Pending"}</span>
             </div>
-          </div>
-        </div>
+          );
+        })}
       </div>
 
-      {loading && (
-        <p className="mt-3 text-xs text-muted-foreground">Loading CGM details…</p>
+      {timelineItems.length === 0 ? (
+        <div className="rounded-2xl border border-dashed border-border/80 bg-muted/20 px-4 py-8 text-center text-sm text-muted-foreground">
+          You haven’t logged anything for this day yet. Tap “Log” on the home screen to capture meals, movement, sleep, or stress notes.
+        </div>
+      ) : (
+        <ol className="space-y-3">
+          {timelineItems.map((item) => {
+            const config = KIND_CONFIG[item.kind];
+            return (
+              <li
+                key={item.id}
+                className="rounded-2xl border border-border/60 bg-background/80 p-4 flex items-start justify-between gap-4"
+              >
+                <div className="flex items-start gap-3">
+                  <span className={cn("mt-1 inline-flex h-8 w-8 items-center justify-center rounded-xl", config.badgeClass)}>
+                    <config.icon className="w-4 h-4" />
+                  </span>
+                  <div>
+                    <p className="text-sm font-semibold">{item.label || config.label}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {config.label} · {formatTimestamp(item.timestampUtc, preferences.locale, preferences.timezone)}
+                    </p>
+                    {item.description && (
+                      <p className="mt-1 text-sm text-muted-foreground/90">{item.description}</p>
+                    )}
+                  </div>
+                </div>
+                <span className="text-xs font-medium text-muted-foreground">
+                  {Math.floor(item.minutesOfDayUtc / 60)
+                    .toString()
+                    .padStart(2, "0")}
+                  :
+                  {(item.minutesOfDayUtc % 60)
+                    .toString()
+                    .padStart(2, "0")}
+                </span>
+              </li>
+            );
+          })}
+        </ol>
       )}
     </Card>
   );
 };
-
-function buildTimestampUtc(day: string, minutes: number) {
-  const base = new Date(`${day}T00:00:00Z`);
-  return new Date(base.getTime() + minutes * 60000).toISOString();
-}

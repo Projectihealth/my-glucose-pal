@@ -36,10 +36,3 @@ Notes:
 - The original backend README is still available at `apps/backend/cgm_butler/README.md` with detailed module docs.
 - The `example_user` exports are stored under `apps/backend/data/example_user` so they are easy to share or replace.
 
-## Why this layout?
-
-- Keeps frontend and backend dependencies isolated (`node_modules` lives under `apps/frontend`, Python packages stay in their own virtualenv).
-- Makes it obvious where to add new services or shared utilities in the future (`apps/` can house more targets without bloating the root).
-- Lets CI/CD and tooling address each app independently (e.g., `npm` workflows vs. Python workflows).
-
-Feel free to extend this structure (e.g., `/apps/mobile`, `/packages/shared-ui`) as the project grows.

@@ -15,6 +15,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { useActivityLog } from "@/context/ActivityLogContext";
 import type { ActivityLogCategory } from "@/context/ActivityLogContext";
 import { useToast } from "@/components/ui/use-toast";
+import { VoiceInput, ParsedVoiceInput } from "@/components/VoiceInput";
+import { ActivityReviewList } from "@/components/ActivityReviewList";
+import { Mic, Keyboard } from "lucide-react";
 
 const defaultTimestamp = () => {
   const now = new Date();
@@ -33,6 +36,9 @@ export const ActivityLogButton = () => {
   const [medicationName, setMedicationName] = useState("");
   const [dose, setDose] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [inputMode, setInputMode] = useState<"voice" | "review" | "manual">("voice");
+  const [voiceTranscript, setVoiceTranscript] = useState("");
+  const [parsedActivities, setParsedActivities] = useState<ParsedVoiceInput[]>([]);
 
   const isMedication = category === "medication";
 
@@ -56,14 +62,80 @@ export const ActivityLogButton = () => {
     setTimestamp(defaultTimestamp());
     setMedicationName("");
     setDose("");
+    setVoiceTranscript("");
+    setInputMode("voice");
+  };
+
+  const handleVoiceTranscriptChange = (transcript: string) => {
+    setVoiceTranscript(transcript);
+  };
+
+  const handleVoiceParseComplete = (parsed: ParsedVoiceInput[]) => {
+    if (parsed && parsed.length > 0) {
+      setParsedActivities(parsed);
+      // Switch to review mode to show all parsed activities
+      setInputMode("review");
+    }
+  };
+
+  const toggleInputMode = () => {
+    if (inputMode === "review") {
+      // Go back to voice mode
+      setInputMode("voice");
+      setParsedActivities([]);
+    } else {
+      setInputMode((prev) => (prev === "voice" ? "manual" : "voice"));
+    }
+  };
+
+  const handleSaveAllActivities = async (activities: ParsedVoiceInput[]) => {
+    setIsSubmitting(true);
+    try {
+      const results = [];
+      for (const activity of activities) {
+        const timestampUtc = formatTimestampForBackend(timestamp);
+        console.log('[ActivityLogButton] Saving activity:', {
+          title: activity.title,
+          timestamp: timestampUtc,
+          timestampInput: timestamp
+        });
+        const result = await addLog({
+          title: activity.title.trim(),
+          category: activity.category,
+          note: activity.note?.trim() || undefined,
+          timestamp: timestampUtc,
+          medicationName:
+            activity.category === "medication" ? activity.medicationName?.trim() : undefined,
+          dose: activity.category === "medication" ? activity.dose?.trim() || undefined : undefined,
+        });
+        console.log('[ActivityLogButton] Activity saved, result:', result);
+        results.push(result);
+      }
+
+      toast({
+        title: "Logged",
+        description: `${activities.length} ${activities.length === 1 ? "entry" : "entries"} saved to your timeline.`,
+      });
+
+      handleOpenChange(false);
+    } catch (error) {
+      console.error("Failed to log activities", error);
+      toast({
+        title: "Something went wrong",
+        description: error instanceof Error ? error.message : "Unable to save activity logs.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const formatTimestampForBackend = (input: string) => {
     const parsed = new Date(input);
     if (Number.isNaN(parsed.getTime())) {
-      return new Date().toISOString().replace("Z", "");
+      return new Date().toISOString();
     }
-    return parsed.toISOString().replace("Z", "");
+    return parsed.toISOString();
   };
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
@@ -75,7 +147,7 @@ export const ActivityLogButton = () => {
       const timestampUtc = formatTimestampForBackend(timestamp);
       await addLog({
         title: title.trim(),
-        category: category === "food" ? "food" : category === "lifestyle" ? "lifestyle" : "medication",
+        category,
         note: note.trim() || undefined,
         timestamp: timestampUtc,
         medicationName: isMedication ? medicationName.trim() : undefined,
@@ -105,19 +177,56 @@ export const ActivityLogButton = () => {
       <DialogTrigger asChild>
         <Button
           size="icon"
-          className="h-14 w-14 rounded-full bg-blue-600 hover:bg-blue-600/90 text-sm font-semibold"
+          className="h-14 w-14 rounded-full bg-blue-600 hover:bg-blue-600/90 text-sm font-semibold shadow-lg shadow-blue-600/40"
         >
-          Log
+          <Mic className="h-6 w-6" />
         </Button>
       </DialogTrigger>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Log an activity</DialogTitle>
-          <DialogDescription>
-            Capture meals, activity, or medication doses so they show alongside your CGM data.
-          </DialogDescription>
+          <div className="flex items-center justify-between">
+            <div>
+              <DialogTitle>Log an activity</DialogTitle>
+              <DialogDescription>
+                {inputMode === "voice" && "Speak naturally to log your activity"}
+                {inputMode === "review" && "Review and edit before saving"}
+                {inputMode === "manual" && "Capture meals, activity, or medication doses"}
+              </DialogDescription>
+            </div>
+            {inputMode !== "review" && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                onClick={toggleInputMode}
+                className="shrink-0"
+              >
+                {inputMode === "voice" ? (
+                  <Keyboard className="h-4 w-4" />
+                ) : (
+                  <Mic className="h-4 w-4" />
+                )}
+              </Button>
+            )}
+          </div>
         </DialogHeader>
-        <form className="space-y-4" onSubmit={handleSubmit}>
+        {inputMode === "voice" ? (
+          <div className="py-4">
+            <VoiceInput
+              onTranscriptChange={handleVoiceTranscriptChange}
+              onParseComplete={handleVoiceParseComplete}
+              autoStart={true}
+            />
+          </div>
+        ) : inputMode === "review" ? (
+          <ActivityReviewList
+            activities={parsedActivities}
+            onSaveAll={handleSaveAllActivities}
+            onCancel={() => setInputMode("voice")}
+            isSubmitting={isSubmitting}
+          />
+        ) : (
+          <form className="space-y-4" onSubmit={handleSubmit}>
           <div className="space-y-2">
             <Label htmlFor="log-title">Title</Label>
             <Input
@@ -140,6 +249,8 @@ export const ActivityLogButton = () => {
                 <option value="food">Food</option>
                 <option value="lifestyle">Lifestyle</option>
                 <option value="medication">Medication</option>
+                <option value="sleep">Sleep</option>
+                <option value="stress">Stress</option>
               </select>
             </div>
             <div className="space-y-2">
@@ -186,12 +297,13 @@ export const ActivityLogButton = () => {
               rows={3}
             />
           </div>
-          <DialogFooter>
-            <Button type="submit" disabled={isSubmitDisabled || isSubmitting} className="w-full">
-              {isSubmitting ? "Saving…" : "Save to timeline"}
-            </Button>
-          </DialogFooter>
-        </form>
+            <DialogFooter>
+              <Button type="submit" disabled={isSubmitDisabled || isSubmitting} className="w-full">
+                {isSubmitting ? "Saving…" : "Save to timeline"}
+              </Button>
+            </DialogFooter>
+          </form>
+        )}
       </DialogContent>
     </Dialog>
   );

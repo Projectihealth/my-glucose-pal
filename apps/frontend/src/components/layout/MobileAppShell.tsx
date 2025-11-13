@@ -12,6 +12,7 @@ import {
 import { cn } from "@/lib/utils";
 import { useLocation, useNavigate } from "react-router-dom";
 import ActivityLogButton from "@/components/ActivityLogButton";
+import { APP_DIALOG_PORTAL_ID } from "@/lib/dom";
 
 interface MobileAppShellProps {
   children: ReactNode;
@@ -55,6 +56,7 @@ export const MobileAppShell = ({ children, className }: MobileAppShellProps) => 
   return (
     <div className="min-h-screen w-full bg-gradient-to-br from-slate-100 via-slate-200/70 to-slate-300 dark:from-slate-900 dark:via-slate-950 dark:to-black flex items-center justify-center p-4 md:p-10 overflow-hidden">
       <div
+        id={APP_DIALOG_PORTAL_ID}
         className="relative w-full max-w-[420px] rounded-[36px] bg-white dark:bg-slate-950 shadow-[0_40px_120px_rgba(15,23,42,0.28)] border border-white/60 dark:border-slate-800 overflow-hidden flex flex-col"
         style={{ height: "min(812px, calc(100vh - 2rem))" }}
       >

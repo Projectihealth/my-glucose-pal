@@ -65,8 +65,8 @@ const Overview = () => {
   return (
     <div className="min-h-full space-y-8">
       <GlucoseChart selectedDay={selectedDayUtc} onDayChange={handleChartDayChange} />
-      <MonthlyCalendar selectedDay={selectedDayLocal} onSelectDay={handleCalendarSelect} />
       <Dashboard selectedDay={selectedDayUtc} />
+      <MonthlyCalendar selectedDay={selectedDayLocal} onSelectDay={handleCalendarSelect} />
 
       <Dialog open={isTimelineOpen && Boolean(timelineDay)} onOpenChange={(open) => {
         setIsTimelineOpen(open);

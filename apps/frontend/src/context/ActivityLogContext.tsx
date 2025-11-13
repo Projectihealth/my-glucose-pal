@@ -1,6 +1,6 @@
 import { createContext, ReactNode, useCallback, useContext, useEffect, useMemo, useState } from "react";
 
-export type ActivityLogCategory = "food" | "lifestyle" | "medication";
+export type ActivityLogCategory = "food" | "lifestyle" | "medication" | "sleep" | "stress";
 
 export interface ActivityLogInput {
   title: string;
@@ -198,6 +198,12 @@ export const ActivityLogProvider = ({ children }: ActivityLogProviderProps) => {
 
   const addOfflineLog = useCallback((entry: ActivityLogInput): ActivityLogEntry => {
     const { iso, day, minutes } = parseTimestamp(entry.timestamp);
+    console.log('[ActivityLogContext] Creating offline log:', {
+      inputTimestamp: entry.timestamp,
+      parsedIso: iso,
+      parsedDay: day,
+      parsedMinutes: minutes
+    });
     const offlineEntry: ActivityLogEntry = {
       ...entry,
       id: generateId(),
@@ -208,6 +214,7 @@ export const ActivityLogProvider = ({ children }: ActivityLogProviderProps) => {
       dose: entry.category === "medication" ? entry.dose : undefined,
       createdAt: new Date().toISOString(),
     };
+    console.log('[ActivityLogContext] Offline log created:', offlineEntry);
     setOfflineLogs((prev) => {
       const next = [offlineEntry, ...prev];
       persistOfflineLogs(next);

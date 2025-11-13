@@ -68,7 +68,7 @@ export function MobileCallInterface({ onBack, onCallEnded }: MobileCallInterface
       </div>
 
       {/* Main Content */}
-      <div className="flex-1 flex flex-col px-6 pt-16 pb-40">
+      <div className="flex-1 flex flex-col px-6 pt-12 pb-48">
         {/* Status Messages */}
         {callStatus.status === 'connecting' && (
           <div className="text-center text-gray-500 text-sm py-4">
@@ -82,7 +82,7 @@ export function MobileCallInterface({ onBack, onCallEnded }: MobileCallInterface
         )}
 
         {/* Animated Orb - Upper portion */}
-        <div className="relative flex items-center justify-center flex-shrink-0" style={{ height: '40vh' }}>
+        <div className="relative flex items-center justify-center flex-shrink-0" style={{ height: '32vh' }}>
           {/* Outer glow rings - only show when agent is speaking */}
           {isAgentSpeaking && (
             <>
@@ -115,13 +115,13 @@ export function MobileCallInterface({ onBack, onCallEnded }: MobileCallInterface
         </div>
 
         {/* Text Display - Lower portion with fixed height */}
-        <div className="flex-1 flex flex-col items-center justify-center px-4 min-h-0">
+        <div className="flex-1 flex flex-col items-center justify-start px-4 pt-8 min-h-0">
           <div 
             className="text-center max-w-md transition-all duration-500 ease-out overflow-hidden"
             style={{ 
               opacity: currentText ? 1 : 0.3,
               transform: currentText ? 'translateY(0)' : 'translateY(20px)',
-              maxHeight: '30vh'
+              maxHeight: '25vh'
             }}
           >
             <div className="overflow-y-auto max-h-full px-2">

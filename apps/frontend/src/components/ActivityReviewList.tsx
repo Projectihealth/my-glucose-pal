@@ -7,7 +7,7 @@ import { Card } from "@/components/ui/card";
 import { X, Check } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { ParsedVoiceInput } from "@/components/VoiceInput";
-import type { ActivityLogCategory } from "@/context/ActivityLogContext";
+import type { ActivityLogCategory, MealType } from "@/context/ActivityLogContext";
 
 interface ActivityReviewListProps {
   activities: ParsedVoiceInput[];
@@ -107,6 +107,11 @@ export const ActivityReviewList = ({
                   </span>
                 </div>
                 <p className="font-medium text-sm truncate">{activity.title}</p>
+                {activity.mealType && (
+                  <p className="text-xs mt-1 capitalize text-muted-foreground">
+                    {activity.mealType}
+                  </p>
+                )}
                 {activity.note && (
                   <p className="text-xs text-muted-foreground mt-1 line-clamp-2">
                     {activity.note}
@@ -170,6 +175,28 @@ export const ActivityReviewList = ({
                     <option value="stress">Stress</option>
                   </select>
                 </div>
+
+                {activity.category === "food" && (
+                  <div className="space-y-2">
+                    <Label htmlFor={`meal-type-${index}`} className="text-xs">
+                      Meal type
+                    </Label>
+                    <select
+                      id={`meal-type-${index}`}
+                      className="h-8 w-full rounded-md border border-input bg-background px-3 text-sm"
+                      value={activity.mealType || ""}
+                      onChange={(e) =>
+                        handleUpdate(index, { mealType: e.target.value as MealType })
+                      }
+                    >
+                      <option value="">Not specified</option>
+                      <option value="breakfast">Breakfast</option>
+                      <option value="lunch">Lunch</option>
+                      <option value="dinner">Dinner</option>
+                      <option value="snack">Snack</option>
+                    </select>
+                  </div>
+                )}
 
                 {activity.category === "medication" && (
                   <div className="grid grid-cols-2 gap-2">

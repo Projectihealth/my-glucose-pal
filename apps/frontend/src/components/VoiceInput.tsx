@@ -18,6 +18,7 @@ export interface ParsedVoiceInput {
   note?: string;
   medicationName?: string;
   dose?: string;
+  mealType?: "breakfast" | "lunch" | "dinner" | "snack";
 }
 
 export const VoiceInput = ({

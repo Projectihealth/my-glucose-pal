@@ -11,7 +11,6 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useLocation, useNavigate } from "react-router-dom";
-import ActivityLogButton from "@/components/ActivityLogButton";
 import { APP_DIALOG_PORTAL_ID } from "@/lib/dom";
 
 interface MobileAppShellProps {
@@ -61,11 +60,6 @@ export const MobileAppShell = ({ children, className }: MobileAppShellProps) => 
         style={{ height: "min(812px, calc(100vh - 2rem))" }}
       >
         <div className="absolute inset-x-16 top-0 h-7 rounded-b-[20px] bg-slate-900/90 dark:bg-slate-700/70" aria-hidden="true" />
-        <div className="pointer-events-none absolute inset-x-0 bottom-[88px] flex justify-center z-30">
-          <div className="pointer-events-auto">
-            <ActivityLogButton />
-          </div>
-        </div>
 
         <div className="flex flex-col h-full">
           <header className="flex items-center justify-between px-7 pt-6 pb-4 text-[13px] font-semibold text-slate-500">

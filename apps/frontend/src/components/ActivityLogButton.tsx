@@ -13,7 +13,7 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { useActivityLog } from "@/context/ActivityLogContext";
-import type { ActivityLogCategory } from "@/context/ActivityLogContext";
+import type { ActivityLogCategory, MealType } from "@/context/ActivityLogContext";
 import { useToast } from "@/components/ui/use-toast";
 import { VoiceInput, ParsedVoiceInput } from "@/components/VoiceInput";
 import { ActivityReviewList } from "@/components/ActivityReviewList";
@@ -35,12 +35,14 @@ export const ActivityLogButton = () => {
   const [timestamp, setTimestamp] = useState(defaultTimestamp);
   const [medicationName, setMedicationName] = useState("");
   const [dose, setDose] = useState("");
+  const [mealType, setMealType] = useState<MealType>("breakfast");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [inputMode, setInputMode] = useState<"voice" | "review" | "manual">("voice");
   const [voiceTranscript, setVoiceTranscript] = useState("");
   const [parsedActivities, setParsedActivities] = useState<ParsedVoiceInput[]>([]);
 
   const isMedication = category === "medication";
+  const isFood = category === "food";
 
   const isSubmitDisabled = useMemo(() => {
     if (!title.trim() || !timestamp) return true;
@@ -62,6 +64,7 @@ export const ActivityLogButton = () => {
     setTimestamp(defaultTimestamp());
     setMedicationName("");
     setDose("");
+    setMealType("breakfast");
     setVoiceTranscript("");
     setInputMode("voice");
   };
@@ -107,6 +110,7 @@ export const ActivityLogButton = () => {
           medicationName:
             activity.category === "medication" ? activity.medicationName?.trim() : undefined,
           dose: activity.category === "medication" ? activity.dose?.trim() || undefined : undefined,
+          mealType: activity.category === "food" ? activity.mealType : undefined,
         });
         console.log('[ActivityLogButton] Activity saved, result:', result);
         results.push(result);
@@ -152,11 +156,12 @@ export const ActivityLogButton = () => {
         timestamp: timestampUtc,
         medicationName: isMedication ? medicationName.trim() : undefined,
         dose: isMedication ? dose.trim() || undefined : undefined,
+        mealType: isFood ? mealType : undefined,
       });
 
       toast({
         title: "Logged",
-        description: "Your entry will appear on today’s CGM timeline.",
+        description: "Your entry will appear on today's CGM timeline.",
       });
 
       handleOpenChange(false);
@@ -242,7 +247,7 @@ export const ActivityLogButton = () => {
               <Label htmlFor="log-category">Category</Label>
               <select
                 id="log-category"
-                className="h-10 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
+                className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
                 value={category}
                 onChange={(event) => setCategory(event.target.value as ActivityLogCategory)}
               >
@@ -264,6 +269,22 @@ export const ActivityLogButton = () => {
               />
             </div>
           </div>
+          {isFood && (
+            <div className="space-y-2">
+              <Label htmlFor="log-meal-type">Meal type</Label>
+              <select
+                id="log-meal-type"
+                className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
+                value={mealType}
+                onChange={(event) => setMealType(event.target.value as MealType)}
+              >
+                <option value="breakfast">Breakfast</option>
+                <option value="lunch">Lunch</option>
+                <option value="dinner">Dinner</option>
+                <option value="snack">Snack</option>
+              </select>
+            </div>
+          )}
           {isMedication && (
             <div className="grid gap-3 sm:grid-cols-2">
               <div className="space-y-2">

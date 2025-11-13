@@ -56,30 +56,30 @@ Extract structured data and return a JSON ARRAY of objects with these fields:
 - note: Optional additional notes (string or null)
 - medicationName: Only for medication category (string or null)
 - dose: Only for medication category (string or null)
+- mealType: Only for food category. One of: "breakfast", "lunch", "dinner", "snack" (string or null)
 
 Examples:
 
 Input: "I went on a walk this morning and I ate six pork dumplings for lunch"
 Output: [
-  {"title": "Morning walk", "category": "lifestyle", "note": null, "medicationName": null, "dose": null},
-  {"title": "Lunch: 6 pork dumplings", "category": "food", "note": null, "medicationName": null, "dose": null}
+  {"title": "Morning walk", "category": "lifestyle", "note": null, "medicationName": null, "dose": null, "mealType": null},
+  {"title": "6 pork dumplings", "category": "food", "note": null, "medicationName": null, "dose": null, "mealType": "lunch"}
 ]
 
 Input: "I just ate a chicken salad with some vegetables and olive oil dressing"
-Output: [{"title": "Chicken salad", "category": "food", "note": "With vegetables and olive oil dressing", "medicationName": null, "dose": null}]
+Output: [{"title": "Chicken salad", "category": "food", "note": "With vegetables and olive oil dressing", "medicationName": null, "dose": null, "mealType": null}]
+
+Input: "Had breakfast with oatmeal and berries"
+Output: [{"title": "Oatmeal and berries", "category": "food", "note": null, "medicationName": null, "dose": null, "mealType": "breakfast"}]
 
 Input: "Took 6 units of humalog before dinner then went for a short walk"
 Output: [
-  {"title": "Humalog", "category": "medication", "note": "Before dinner", "medicationName": "Humalog", "dose": "6 units"},
-  {"title": "Short walk", "category": "lifestyle", "note": "After dinner", "medicationName": null, "dose": null}
+  {"title": "Humalog", "category": "medication", "note": "Before dinner", "medicationName": "Humalog", "dose": "6 units", "mealType": null},
+  {"title": "Short walk", "category": "lifestyle", "note": "After dinner", "medicationName": null, "dose": null, "mealType": null}
 ]
 
-Input: "Had breakfast with oatmeal and berries, took my metformin, then did 20 minutes of yoga"
-Output: [
-  {"title": "Breakfast: Oatmeal and berries", "category": "food", "note": null, "medicationName": null, "dose": null},
-  {"title": "Metformin", "category": "medication", "note": null, "medicationName": "Metformin", "dose": null},
-  {"title": "20 minutes of yoga", "category": "lifestyle", "note": null, "medicationName": null, "dose": null}
-]
+Input: "Had a protein bar as a snack after my workout"
+Output: [{"title": "Protein bar", "category": "food", "note": "After workout", "medicationName": null, "dose": null, "mealType": "snack"}]
 
 Return ONLY a valid JSON array, no additional text.`;
 
@@ -218,6 +218,7 @@ const parseSegment = (text: string, original: string): ParsedVoiceInput | null =
   let note = "";
   let medicationName = "";
   let dose = "";
+  let mealType: ParsedVoiceInput["mealType"] = undefined;
 
   // Detect category from keywords
   if (
@@ -336,12 +337,20 @@ const parseSegment = (text: string, original: string): ParsedVoiceInput | null =
 
   // Extract food items for food category with meal context
   if (category === "food") {
-    const mealTimes = ["breakfast", "lunch", "dinner", "snack"];
+    const mealTimes: Array<{ keyword: string; type: "breakfast" | "lunch" | "dinner" | "snack" }> = [
+      { keyword: "breakfast", type: "breakfast" },
+      { keyword: "lunch", type: "lunch" },
+      { keyword: "dinner", type: "dinner" },
+      { keyword: "snack", type: "snack" },
+    ];
+
     let mealContext = "";
 
+    // Detect meal type from keywords
     for (const meal of mealTimes) {
-      if (text.includes(meal)) {
-        mealContext = meal.charAt(0).toUpperCase() + meal.slice(1);
+      if (text.includes(meal.keyword)) {
+        mealContext = meal.keyword.charAt(0).toUpperCase() + meal.keyword.slice(1);
+        mealType = meal.type;
         break;
       }
     }
@@ -362,18 +371,14 @@ const parseSegment = (text: string, original: string): ParsedVoiceInput | null =
         if (parts.length > 1) {
           let foodPart = parts[1].trim().split(/[.!?,]/)[0];
 
-          // Remove "for breakfast/lunch/dinner" from the food part
+          // Remove "for breakfast/lunch/dinner/snack" from the food part
           for (const meal of mealTimes) {
-            foodPart = foodPart.replace(new RegExp(`for ${meal}`, 'gi'), '').trim();
+            foodPart = foodPart.replace(new RegExp(`for ${meal.keyword}`, 'gi'), '').trim();
           }
 
           if (foodPart) {
-            // Format: "Lunch: Pork dumplings" or just "Pork dumplings"
-            if (mealContext) {
-              title = `${mealContext}: ${foodPart.charAt(0).toUpperCase() + foodPart.slice(1)}`;
-            } else {
-              title = foodPart.charAt(0).toUpperCase() + foodPart.slice(1);
-            }
+            // Just use the food name as title, mealType is separate
+            title = foodPart.charAt(0).toUpperCase() + foodPart.slice(1);
           }
         }
         break;
@@ -382,7 +387,7 @@ const parseSegment = (text: string, original: string): ParsedVoiceInput | null =
 
     // If no food keyword found but has meal context, use that
     if (!foundFood && mealContext && sentences.length > 0) {
-      title = `${mealContext}: ${sentences[0].trim().charAt(0).toUpperCase() + sentences[0].trim().slice(1)}`;
+      title = sentences[0].trim().charAt(0).toUpperCase() + sentences[0].trim().slice(1);
     } else if (!foundFood && sentences.length > 0) {
       title = sentences[0].trim();
       title = title.charAt(0).toUpperCase() + title.slice(1);
@@ -415,5 +420,6 @@ const parseSegment = (text: string, original: string): ParsedVoiceInput | null =
     note: note || undefined,
     medicationName: medicationName || undefined,
     dose: dose || undefined,
+    mealType: mealType || undefined,
   };
 };

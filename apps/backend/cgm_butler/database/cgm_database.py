@@ -74,6 +74,7 @@ class CGMDatabase:
                 minutes_of_day_utc INTEGER NOT NULL,
                 medication_name TEXT,
                 dose TEXT,
+                meal_type TEXT,
                 created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
             )
             """
@@ -272,11 +273,15 @@ class CGMDatabase:
         note: Optional[str] = None,
         medication_name: Optional[str] = None,
         dose: Optional[str] = None,
+        meal_type: Optional[str] = None,
     ) -> Dict:
         """添加一条活动日志并返回创建的记录"""
 
-        if category not in {"food", "lifestyle", "medication"}:
+        if category not in {"food", "lifestyle", "medication", "sleep", "stress"}:
             raise ValueError("Invalid category")
+
+        if meal_type and meal_type not in {"breakfast", "lunch", "dinner", "snack"}:
+            raise ValueError("Invalid meal_type")
 
         normalised_timestamp, day_utc, minutes = self._normalise_timestamp_utc(timestamp_utc)
 
@@ -292,8 +297,9 @@ class CGMDatabase:
                 day_utc,
                 minutes_of_day_utc,
                 medication_name,
-                dose
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                dose,
+                meal_type
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 user_id,
@@ -305,6 +311,7 @@ class CGMDatabase:
                 minutes,
                 medication_name,
                 dose,
+                meal_type,
             ),
         )
         self.conn.commit()
@@ -348,7 +355,71 @@ class CGMDatabase:
         cursor.execute(query, params)
         rows = cursor.fetchall()
         return [dict(row) for row in rows]
-    
+
+    def delete_activity_log(self, log_id: int) -> bool:
+        """删除活动日志"""
+        cursor = self.conn.cursor()
+        cursor.execute("DELETE FROM activity_logs WHERE id = ?", (log_id,))
+        self.conn.commit()
+        return cursor.rowcount > 0
+
+    def update_activity_log(
+        self,
+        log_id: int,
+        *,
+        title: Optional[str] = None,
+        category: Optional[str] = None,
+        note: Optional[str] = None,
+        timestamp_utc: Optional[str] = None,
+        medication_name: Optional[str] = None,
+        dose: Optional[str] = None,
+        meal_type: Optional[str] = None,
+    ) -> Dict:
+        """更新活动日志"""
+        # Get current log
+        current = self.get_activity_log_by_id(log_id)
+        if not current:
+            raise ValueError(f"Activity log {log_id} not found")
+
+        # Build update fields
+        updates = {}
+        if title is not None:
+            updates['title'] = title
+        if category is not None:
+            if category not in {"food", "lifestyle", "medication", "sleep", "stress"}:
+                raise ValueError("Invalid category")
+            updates['category'] = category
+        if note is not None:
+            updates['note'] = note
+        if medication_name is not None:
+            updates['medication_name'] = medication_name
+        if dose is not None:
+            updates['dose'] = dose
+        if meal_type is not None:
+            if meal_type and meal_type not in {"breakfast", "lunch", "dinner", "snack"}:
+                raise ValueError("Invalid meal_type")
+            updates['meal_type'] = meal_type
+
+        # Handle timestamp update
+        if timestamp_utc is not None:
+            normalised_timestamp, day_utc, minutes = self._normalise_timestamp_utc(timestamp_utc)
+            updates['timestamp_utc'] = normalised_timestamp
+            updates['day_utc'] = day_utc
+            updates['minutes_of_day_utc'] = minutes
+
+        if not updates:
+            return current
+
+        # Build and execute UPDATE query
+        set_clause = ', '.join([f"{key} = ?" for key in updates.keys()])
+        values = list(updates.values()) + [log_id]
+
+        cursor = self.conn.cursor()
+        cursor.execute(f"UPDATE activity_logs SET {set_clause} WHERE id = ?", values)
+        self.conn.commit()
+
+        return self.get_activity_log_by_id(log_id)
+
     def get_latest_reading(self, user_id: str) -> Optional[Dict]:
         """
         获取用户最新的 CGM 读数

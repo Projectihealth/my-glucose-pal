@@ -96,20 +96,23 @@ export function MobileCallInterface({ onBack, onCallEnded }: MobileCallInterface
           )}
           
           {/* Background glow */}
-          <div className="absolute inset-0 w-40 h-40 rounded-full bg-[#5B7FF3] blur-xl opacity-50 left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2"></div>
+          <div className="absolute inset-0 w-40 h-40 rounded-full bg-[#5B7FF3] blur-xl opacity-40 left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2"></div>
           
-          {/* Main orb */}
-          <div className={`relative w-40 h-40 rounded-full bg-gradient-to-br from-[#6B8FF5] via-[#5B7FF3] to-[#4A6FE3] shadow-2xl transition-all duration-300 ${
+          {/* Main avatar with photo */}
+          <div className={`relative w-40 h-40 rounded-full shadow-2xl transition-all duration-300 overflow-hidden ${
             isAgentSpeaking ? 'scale-110' : 'scale-100'
           }`} style={{ 
-            boxShadow: '0 0 60px rgba(91, 127, 243, 0.6), 0 0 100px rgba(91, 127, 243, 0.3), inset 0 0 60px rgba(255, 255, 255, 0.15)'
+            boxShadow: '0 0 60px rgba(91, 127, 243, 0.6), 0 0 100px rgba(91, 127, 243, 0.3)',
+            backgroundImage: 'url(https://www.cincinnati.com/gcdn/presto/2023/06/15/PCIN/998a4762-200a-4e57-a3dc-f4bc0d91593c-male_nurse_jobs_1030x687.jpeg?crop=515,687,x412,y0)',
+            backgroundSize: 'cover',
+            backgroundPosition: 'center'
           }}>
-            {/* Inner gradient overlay */}
-            <div className="absolute inset-0 rounded-full bg-gradient-to-t from-transparent via-white/10 to-white/30"></div>
+            {/* Subtle overlay for better integration */}
+            <div className="absolute inset-0 rounded-full bg-gradient-to-t from-black/10 via-transparent to-white/10"></div>
             
             {/* Animated shine effect */}
             <div className="absolute inset-0 rounded-full overflow-hidden">
-              <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-br from-white/40 via-transparent to-transparent opacity-50"></div>
+              <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-br from-white/30 via-transparent to-transparent opacity-40"></div>
             </div>
           </div>
         </div>

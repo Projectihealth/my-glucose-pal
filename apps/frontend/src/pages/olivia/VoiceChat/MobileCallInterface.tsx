@@ -61,14 +61,14 @@ export function MobileCallInterface({ onBack, onCallEnded }: MobileCallInterface
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-[#F8F9FA] to-[#E8EBF0] flex flex-col max-w-[430px] mx-auto relative">
+    <div className="absolute inset-0 bg-gradient-to-b from-[#F8F9FA] to-[#E8EBF0] flex flex-col overflow-hidden">
       {/* Timer */}
       <div className="absolute top-6 left-0 right-0 text-center z-10">
         <p className="text-gray-500">{formatDuration(duration)}</p>
       </div>
 
       {/* Main Content */}
-      <div className="flex-1 flex flex-col px-6 pt-16 pb-32">
+      <div className="flex-1 flex flex-col px-6 pt-16 pb-40">
         {/* Status Messages */}
         {callStatus.status === 'connecting' && (
           <div className="text-center text-gray-500 text-sm py-4">
@@ -82,7 +82,7 @@ export function MobileCallInterface({ onBack, onCallEnded }: MobileCallInterface
         )}
 
         {/* Animated Orb - Upper portion */}
-        <div className="relative flex items-center justify-center" style={{ height: '35vh' }}>
+        <div className="relative flex items-center justify-center flex-shrink-0" style={{ height: '40vh' }}>
           {/* Outer glow rings - only show when agent is speaking */}
           {isAgentSpeaking && (
             <>
@@ -114,24 +114,27 @@ export function MobileCallInterface({ onBack, onCallEnded }: MobileCallInterface
           </div>
         </div>
 
-        {/* Text Display - Lower portion */}
-        <div className="flex-1 flex flex-col items-center justify-start pt-8 px-2">
+        {/* Text Display - Lower portion with fixed height */}
+        <div className="flex-1 flex flex-col items-center justify-center px-4 min-h-0">
           <div 
-            className="text-center max-w-md transition-all duration-500 ease-out" 
+            className="text-center max-w-md transition-all duration-500 ease-out overflow-hidden"
             style={{ 
               opacity: currentText ? 1 : 0.3,
-              transform: currentText ? 'translateY(0)' : 'translateY(20px)'
+              transform: currentText ? 'translateY(0)' : 'translateY(20px)',
+              maxHeight: '30vh'
             }}
           >
-            <p className="text-gray-800 text-xl leading-relaxed">
-              {currentText || 'Listening...'}
-            </p>
+            <div className="overflow-y-auto max-h-full px-2">
+              <p className="text-gray-800 text-lg leading-relaxed">
+                {currentText || 'Listening...'}
+              </p>
+            </div>
           </div>
         </div>
       </div>
 
       {/* Bottom Controls */}
-      <div className="absolute bottom-12 left-0 right-0 px-8">
+      <div className="absolute bottom-12 left-0 right-0 px-8 z-20">
         <div className="flex items-end justify-between">
           {/* Exit Button */}
           <button

@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { ArrowLeft, PhoneOff, Bot, UserCircle } from 'lucide-react';
+import { X, Mic, MessageSquare, MicOff, Bot, UserCircle } from 'lucide-react';
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useRetellCall } from "../../../hooks/olivia/useRetellCall";
 
@@ -11,6 +11,9 @@ interface MobileCallInterfaceProps {
 export function MobileCallInterface({ onBack, onCallEnded }: MobileCallInterfaceProps) {
   const userId = import.meta.env.VITE_DEFAULT_USER_ID || 'user_001';
   const scrollAreaRef = useRef<HTMLDivElement>(null);
+  const [currentText, setCurrentText] = useState('');
+  const [isMuted, setIsMuted] = useState(false);
+  const [showTranscript, setShowTranscript] = useState(false);
   
   const {
     startCall,
@@ -19,6 +22,7 @@ export function MobileCallInterface({ onBack, onCallEnded }: MobileCallInterface
     transcript,
     duration,
     callId,
+    isAgentSpeaking,
   } = useRetellCall(userId);
 
   // Auto-start call when component mounts
@@ -26,22 +30,29 @@ export function MobileCallInterface({ onBack, onCallEnded }: MobileCallInterface
     startCall();
   }, [startCall]);
 
+  // Update current text when transcript changes
+  useEffect(() => {
+    if (transcript.length > 0) {
+      const lastMessage = transcript[transcript.length - 1];
+      setCurrentText(lastMessage.content);
+    }
+  }, [transcript]);
+
   // Handle call end
   const handleEndCall = async () => {
     await endCall();
-    // Pass callId and transcript to parent for results page
     onCallEnded(callId, transcript);
   };
 
-  // Auto scroll to bottom when new messages arrive
+  // Auto scroll to bottom when new messages arrive in transcript overlay
   useEffect(() => {
-    if (scrollAreaRef.current) {
+    if (scrollAreaRef.current && showTranscript) {
       const scrollContainer = scrollAreaRef.current.querySelector('[data-radix-scroll-area-viewport]');
       if (scrollContainer) {
         scrollContainer.scrollTop = scrollContainer.scrollHeight;
       }
     }
-  }, [transcript]);
+  }, [transcript, showTranscript]);
 
   const formatDuration = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
@@ -50,80 +61,180 @@ export function MobileCallInterface({ onBack, onCallEnded }: MobileCallInterface
   };
 
   return (
-    <div className="min-h-screen bg-[#F8F9FA] flex flex-col max-w-[430px] mx-auto">
-      {/* Header */}
-      <div className="bg-white border-b border-gray-200 px-4 py-3 flex items-center justify-between flex-shrink-0">
-        <button onClick={onBack} className="p-2 -ml-2 active:bg-gray-100 rounded-full">
-          <ArrowLeft className="w-6 h-6 text-gray-700" />
-        </button>
-        <div className="text-center flex-1">
-          <h1 className="text-gray-800">Voice Chat</h1>
-          <p className="text-sm text-gray-500">{formatDuration(duration)}</p>
-        </div>
-        <div className="w-10" /> {/* Spacer for centering */}
+    <div className="min-h-screen bg-gradient-to-b from-[#F8F9FA] to-[#E8EBF0] flex flex-col max-w-[430px] mx-auto relative">
+      {/* Timer */}
+      <div className="absolute top-6 left-0 right-0 text-center z-10">
+        <p className="text-gray-500">{formatDuration(duration)}</p>
       </div>
 
-      {/* Conversation Area */}
-      <div className="flex-1 overflow-hidden">
-        <ScrollArea ref={scrollAreaRef} className="h-full">
-          <div className="px-4 py-4 space-y-3 pb-4">
-            {callStatus.status === 'connecting' && (
-              <div className="text-center text-gray-500 text-sm py-4">
-                Connecting...
-              </div>
-            )}
-            {callStatus.status === 'error' && (
-              <div className="text-center text-red-500 text-sm py-4">
-                {callStatus.error}
-              </div>
-            )}
-            {transcript.map((message, index) => (
-              <div
-                key={index}
-                className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
-              >
-                <div className={`flex gap-2 max-w-[85%] ${message.role === 'user' ? 'flex-row-reverse' : 'flex-row'}`}>
-                  {/* Avatar */}
-                  <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${
-                    message.role === 'agent' ? 'bg-[#EEF2FF]' : 'bg-gray-200'
-                  }`}>
-                    {message.role === 'agent' ? (
-                      <Bot className="w-4 h-4 text-[#5B7FF3]" />
-                    ) : (
-                      <UserCircle className="w-4 h-4 text-gray-600" />
-                    )}
-                  </div>
-                  
-                  {/* Message Bubble */}
-                  <div className={`rounded-2xl px-4 py-3 ${
-                    message.role === 'agent'
-                      ? 'bg-white border border-gray-200'
-                      : 'bg-[#5B7FF3] text-white'
-                  }`}>
-                    <p className={`text-sm leading-relaxed ${
-                      message.role === 'agent' ? 'text-gray-700' : 'text-white'
-                    }`}>
-                      {message.content}
-                    </p>
-                  </div>
-                </div>
-              </div>
-            ))}
+      {/* Main Content */}
+      <div className="flex-1 flex flex-col px-6 pt-16 pb-32">
+        {/* Status Messages */}
+        {callStatus.status === 'connecting' && (
+          <div className="text-center text-gray-500 text-sm py-4">
+            Connecting to Olivia...
           </div>
-        </ScrollArea>
+        )}
+        {callStatus.status === 'error' && (
+          <div className="text-center text-red-500 text-sm py-4 px-4 bg-red-50 rounded-lg">
+            {callStatus.error}
+          </div>
+        )}
+
+        {/* Animated Orb - Upper portion */}
+        <div className="relative flex items-center justify-center" style={{ height: '35vh' }}>
+          {/* Outer glow rings - only show when agent is speaking */}
+          {isAgentSpeaking && (
+            <>
+              <div className="absolute inset-0 w-56 h-56 -translate-x-1/2 -translate-y-1/2 left-1/2 top-1/2">
+                <div className="absolute inset-0 rounded-full bg-[#5B7FF3]/20 animate-ping" style={{ animationDuration: '2s' }}></div>
+              </div>
+              <div className="absolute inset-0 w-48 h-48 -translate-x-1/2 -translate-y-1/2 left-1/2 top-1/2">
+                <div className="absolute inset-0 rounded-full bg-[#5B7FF3]/30 animate-ping" style={{ animationDuration: '1.5s' }}></div>
+              </div>
+            </>
+          )}
+          
+          {/* Background glow */}
+          <div className="absolute inset-0 w-40 h-40 rounded-full bg-[#5B7FF3] blur-xl opacity-50 left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2"></div>
+          
+          {/* Main orb */}
+          <div className={`relative w-40 h-40 rounded-full bg-gradient-to-br from-[#6B8FF5] via-[#5B7FF3] to-[#4A6FE3] shadow-2xl transition-all duration-300 ${
+            isAgentSpeaking ? 'scale-110' : 'scale-100'
+          }`} style={{ 
+            boxShadow: '0 0 60px rgba(91, 127, 243, 0.6), 0 0 100px rgba(91, 127, 243, 0.3), inset 0 0 60px rgba(255, 255, 255, 0.15)'
+          }}>
+            {/* Inner gradient overlay */}
+            <div className="absolute inset-0 rounded-full bg-gradient-to-t from-transparent via-white/10 to-white/30"></div>
+            
+            {/* Animated shine effect */}
+            <div className="absolute inset-0 rounded-full overflow-hidden">
+              <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-br from-white/40 via-transparent to-transparent opacity-50"></div>
+            </div>
+          </div>
+        </div>
+
+        {/* Text Display - Lower portion */}
+        <div className="flex-1 flex flex-col items-center justify-start pt-8 px-2">
+          <div 
+            className="text-center max-w-md transition-all duration-500 ease-out" 
+            style={{ 
+              opacity: currentText ? 1 : 0.3,
+              transform: currentText ? 'translateY(0)' : 'translateY(20px)'
+            }}
+          >
+            <p className="text-gray-800 text-xl leading-relaxed">
+              {currentText || 'Listening...'}
+            </p>
+          </div>
+        </div>
       </div>
 
-      {/* Call Controls */}
-      <div className="bg-white border-t border-gray-200 px-4 py-4 flex-shrink-0">
-        <button
-          onClick={handleEndCall}
-          disabled={callStatus.status === 'idle' || callStatus.status === 'error'}
-          className="w-full bg-red-500 text-white py-4 rounded-full text-lg active:scale-[0.98] transition-transform shadow-sm flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          <PhoneOff className="w-5 h-5" />
-          End Call
-        </button>
+      {/* Bottom Controls */}
+      <div className="absolute bottom-12 left-0 right-0 px-8">
+        <div className="flex items-end justify-between">
+          {/* Exit Button */}
+          <button
+            onClick={handleEndCall}
+            className="flex flex-col items-center gap-2 active:scale-95 transition-transform"
+          >
+            <div className="w-14 h-14 rounded-full bg-white shadow-lg flex items-center justify-center border border-gray-200">
+              <X className="w-6 h-6 text-gray-700" />
+            </div>
+            <span className="text-xs text-gray-600">Exit</span>
+          </button>
+
+          {/* Microphone Button */}
+          <button
+            onClick={() => setIsMuted(!isMuted)}
+            className="flex flex-col items-center gap-2 active:scale-95 transition-transform -mb-4"
+            disabled={callStatus.status !== 'connected'}
+          >
+            <div className={`w-20 h-20 rounded-full bg-gradient-to-br shadow-2xl flex items-center justify-center transition-all ${
+              isMuted 
+                ? 'from-gray-400 to-gray-500 shadow-gray-400/50' 
+                : 'from-[#5B7FF3] to-[#7B5FFF] shadow-[#5B7FF3]/50'
+            }`}>
+              {isMuted ? (
+                <MicOff className="w-9 h-9 text-white" />
+              ) : (
+                <Mic className="w-9 h-9 text-white" />
+              )}
+            </div>
+          </button>
+
+          {/* Transcript Button */}
+          <button
+            onClick={() => setShowTranscript(true)}
+            className="flex flex-col items-center gap-2 active:scale-95 transition-transform"
+          >
+            <div className="w-14 h-14 rounded-full bg-white shadow-lg flex items-center justify-center border border-gray-200">
+              <MessageSquare className="w-6 h-6 text-gray-700" />
+            </div>
+            <span className="text-xs text-gray-600">Transcript</span>
+          </button>
+        </div>
       </div>
+
+      {/* Transcript Overlay */}
+      {showTranscript && (
+        <div className="absolute inset-0 bg-white z-50 flex flex-col">
+          <div className="bg-white border-b border-gray-100 px-4 py-4 flex items-center shadow-sm">
+            <button 
+              onClick={() => setShowTranscript(false)} 
+              className="p-2 -ml-2 active:bg-gray-100 rounded-full transition-colors"
+            >
+              <X className="w-6 h-6 text-gray-700" />
+            </button>
+            <h2 className="text-gray-800 ml-3 font-medium">Conversation Transcript</h2>
+          </div>
+          
+          <div className="flex-1 overflow-hidden">
+            <ScrollArea ref={scrollAreaRef} className="h-full">
+              <div className="px-4 py-4 space-y-3">
+                {transcript.length === 0 ? (
+                  <div className="text-center text-gray-500 text-sm py-8">
+                    No conversation yet. Start talking to Olivia!
+                  </div>
+                ) : (
+                  transcript.map((message, index) => (
+                    <div
+                      key={index}
+                      className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
+                    >
+                      <div className={`flex gap-2 max-w-[85%] ${message.role === 'user' ? 'flex-row-reverse' : 'flex-row'}`}>
+                        {/* Avatar */}
+                        <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${
+                          message.role === 'agent' ? 'bg-[#EEF2FF]' : 'bg-gray-200'
+                        }`}>
+                          {message.role === 'agent' ? (
+                            <Bot className="w-4 h-4 text-[#5B7FF3]" />
+                          ) : (
+                            <UserCircle className="w-4 h-4 text-gray-600" />
+                          )}
+                        </div>
+                        
+                        {/* Message Bubble */}
+                        <div className={`rounded-2xl px-4 py-3 ${
+                          message.role === 'agent'
+                            ? 'bg-white border border-gray-200 shadow-sm'
+                            : 'bg-[#5B7FF3] text-white'
+                        }`}>
+                          <p className={`text-sm leading-relaxed ${
+                            message.role === 'agent' ? 'text-gray-700' : 'text-white'
+                          }`}>
+                            {message.content}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </ScrollArea>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

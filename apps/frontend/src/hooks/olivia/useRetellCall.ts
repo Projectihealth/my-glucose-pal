@@ -11,6 +11,7 @@ interface UseRetellCallResult {
   callStatus: CallStatus;
   transcript: TranscriptMessage[];
   isCallActive: boolean;
+  isAgentSpeaking: boolean;
   startCall: () => Promise<void>;
   endCall: () => void;
   toggleMute: () => void;
@@ -136,6 +137,7 @@ export function useRetellCall(userId: string): UseRetellCallResult {
   const [callStatus, setCallStatus] = useState<CallStatus>({ status: 'idle' });
   const [transcript, setTranscript] = useState<TranscriptMessage[]>([]);
   const [isMuted, setIsMuted] = useState(false);
+  const [isAgentSpeaking, setIsAgentSpeaking] = useState(false);
   const [sdkLoaded, setSdkLoaded] = useState(false);
   const [duration, setDuration] = useState(0);
   
@@ -210,10 +212,12 @@ export function useRetellCall(userId: string): UseRetellCallResult {
 
       client.on('agent_start_talking', () => {
         console.log('🗣️ Agent started talking');
+        setIsAgentSpeaking(true);
       });
 
       client.on('agent_stop_talking', () => {
         console.log('🤐 Agent stopped talking');
+        setIsAgentSpeaking(false);
       });
 
       client.on('update', (update: any) => {
@@ -349,6 +353,7 @@ export function useRetellCall(userId: string): UseRetellCallResult {
     callStatus,
     transcript,
     isCallActive,
+    isAgentSpeaking,
     startCall,
     endCall,
     toggleMute,

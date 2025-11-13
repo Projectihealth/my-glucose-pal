@@ -99,11 +99,12 @@
 .mainVideo {
 	position: absolute;
 	inset: 0;
-	object-position: center;
-	object-fit: cover !important;
+	object-position: center center;
+	object-fit: contain !important;
 	height: 100%;
 	width: 100%;
 	transition: all 0.3s ease;
+	transform: scale(1.4) translateY(5%);
 }
 
 .mainVideoScreenSharing {
@@ -180,7 +181,7 @@
 .selfViewContainer {
 	position: absolute;
 	bottom: 7.5rem;
-	left: 1rem;
+	right: 1rem;
 	display: flex;
 	align-items: center;
 	justify-content: center;

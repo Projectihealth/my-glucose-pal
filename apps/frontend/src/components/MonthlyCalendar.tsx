@@ -144,7 +144,7 @@ export const MonthlyCalendar = ({ selectedDay, onSelectDay }: MonthlyCalendarPro
         dotClass,
       };
     });
-  }, [viewDate, summaries, mealCounts, activityMinutes]);
+  }, [viewDate, summaryByLocalDay, mealCounts, activityMinutes]);
 
   const monthFormatter = useMemo(
     () =>
@@ -198,8 +198,8 @@ export const MonthlyCalendar = ({ selectedDay, onSelectDay }: MonthlyCalendarPro
             }
 
             const isSelected = selectedDay === cell.iso;
-            const showStar = getAchievement(summary, cell.meals, cell.activity);
-            const title = summary ? `${summary.tir.toFixed(0)}% in range` : "No CGM data";
+            const showStar = getAchievement(cell.summary, cell.meals, cell.activity);
+            const title = cell.summary ? `${cell.summary.tir.toFixed(0)}% in range` : "No CGM data";
 
             const content = (
               <button
@@ -208,7 +208,7 @@ export const MonthlyCalendar = ({ selectedDay, onSelectDay }: MonthlyCalendarPro
                   className={cn(
                     "relative flex h-16 flex-col items-center justify-center rounded-2xl border text-sm",
                     isSelected ? "border-primary/60 bg-primary/5" : "border-border/60 bg-muted/40",
-                    summary ? "hover:border-primary/50" : "opacity-60",
+                    cell.summary ? "hover:border-primary/50" : "opacity-60",
                   )}
               >
                 <span className="text-sm font-semibold">{cell.label}</span>
@@ -235,7 +235,7 @@ export const MonthlyCalendar = ({ selectedDay, onSelectDay }: MonthlyCalendarPro
                 <TooltipTrigger asChild>{content}</TooltipTrigger>
                 <TooltipContent className="text-xs">
                   <p className="font-medium">{title}</p>
-                  <p>Avg: {summary ? `${summary.avgGlucose.toFixed(0)} mg/dL` : "--"}</p>
+                  <p>Avg: {cell.summary ? `${cell.summary.avgGlucose.toFixed(0)} mg/dL` : "--"}</p>
                   <p>Meals logged: {cell.meals}</p>
                   <p>Activity minutes: {cell.activity}</p>
                 </TooltipContent>

@@ -100,15 +100,15 @@ export function MobileCallInterface({ onBack, onCallEnded }: MobileCallInterface
               </div>
             </>
           )}
-          
+
           {/* Background glow */}
-          <div className="absolute inset-0 w-40 h-40 rounded-full bg-[#5B7FF3] blur-xl opacity-40 left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2"></div>
+          <div className="absolute inset-0 w-40 h-40 rounded-full bg-[#5B7FF3] blur-xl opacity-30 left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2"></div>
           
           {/* Main avatar with photo */}
           <div className={`relative w-40 h-40 rounded-full shadow-2xl transition-all duration-300 overflow-hidden ${
             isAgentSpeaking ? 'scale-110' : 'scale-100'
-          }`} style={{ 
-            boxShadow: '0 0 60px rgba(91, 127, 243, 0.6), 0 0 100px rgba(91, 127, 243, 0.3)',
+          }`} style={{
+            boxShadow: '0 0 60px rgba(91, 127, 243, 0.5), 0 0 100px rgba(91, 127, 243, 0.25)',
             backgroundImage: 'url(https://www.cincinnati.com/gcdn/presto/2023/06/15/PCIN/998a4762-200a-4e57-a3dc-f4bc0d91593c-male_nurse_jobs_1030x687.jpeg?crop=515,687,x412,y0)',
             backgroundSize: 'cover',
             backgroundPosition: 'center'
@@ -163,9 +163,9 @@ export function MobileCallInterface({ onBack, onCallEnded }: MobileCallInterface
             disabled={callStatus.status !== 'connected'}
           >
             <div className={`w-20 h-20 rounded-full bg-gradient-to-br shadow-2xl flex items-center justify-center transition-all ${
-              isMuted 
-                ? 'from-gray-400 to-gray-500 shadow-gray-400/50' 
-                : 'from-[#5B7FF3] to-[#4A6FE3] shadow-[#5B7FF3]/50'
+              isMuted
+                ? 'from-gray-400 to-gray-500 shadow-gray-400/50'
+                : 'from-[#5B7FF3] to-[#4A90E2] shadow-[#5B7FF3]/40'
             }`}>
               {isMuted ? (
                 <MicOff className="w-9 h-9 text-white" />
@@ -225,7 +225,7 @@ export function MobileCallInterface({ onBack, onCallEnded }: MobileCallInterface
                             <UserCircle className="w-4 h-4 text-gray-600" />
                           )}
                         </div>
-                        
+
                         {/* Message Bubble */}
                         <div className={`rounded-2xl px-4 py-3 ${
                           message.role === 'agent'

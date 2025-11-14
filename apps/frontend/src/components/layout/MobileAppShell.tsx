@@ -71,7 +71,7 @@ export const MobileAppShell = ({ children, className }: MobileAppShellProps) => 
             </div>
           </header>
 
-          <main className={cn("flex-1 overflow-y-auto pb-28", className)}>
+          <main className={cn("flex-1 overflow-y-auto pb-28 relative", className)}>
             {children}
           </main>
 

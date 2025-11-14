@@ -75,27 +75,41 @@ class TavusClient:
         
         return response.json()
     
-    def create_conversation(self, persona_id: str, config: Dict[str, Any]) -> Dict:
+    def create_conversation(self, replica_id: str, persona_id: str,
+                          conversational_context: Optional[str] = None,
+                          custom_greeting: Optional[str] = None,
+                          properties: Optional[Dict[str, Any]] = None) -> Dict:
         """
         Create a new conversation with the digital avatar.
-        
+
         Args:
-            persona_id: The persona ID
-            config: Conversation configuration
-        
+            replica_id: The replica ID (required)
+            persona_id: The persona ID (required)
+            conversational_context: Optional context for the conversation
+            custom_greeting: Optional custom greeting message
+            properties: Optional properties (language, max_call_duration, etc.)
+
         Returns:
-            Conversation details including session ID
+            Conversation details including conversation_id and conversation_url
         """
         url = f"{self.BASE_URL}/v2/conversations"
-        
+
         data = {
-            "persona_id": persona_id,
-            **config
+            "replica_id": replica_id,
+            "persona_id": persona_id
         }
-        
+
+        # Add optional parameters
+        if conversational_context:
+            data["conversational_context"] = conversational_context
+        if custom_greeting:
+            data["custom_greeting"] = custom_greeting
+        if properties:
+            data["properties"] = properties
+
         response = requests.post(url, headers=self.headers, json=data)
         response.raise_for_status()
-        
+
         return response.json()
     
     def send_message(self, conversation_id: str, message: str) -> Dict:
@@ -139,19 +153,22 @@ class TavusClient:
     
     def end_conversation(self, conversation_id: str) -> Dict:
         """
-        End a conversation.
-        
+        End/Delete a conversation.
+
         Args:
             conversation_id: The conversation ID
-        
+
         Returns:
             Response confirming conversation ended
         """
-        url = f"{self.BASE_URL}/v2/conversations/{conversation_id}/end"
-        
-        response = requests.post(url, headers=self.headers)
+        url = f"{self.BASE_URL}/v2/conversations/{conversation_id}"
+
+        response = requests.delete(url, headers=self.headers)
         response.raise_for_status()
-        
+
+        # DELETE returns 204 No Content on success
+        if response.status_code == 204:
+            return {"success": True, "message": "Conversation deleted"}
         return response.json()
     
     def get_active_conversations_from_api(self) -> List[Dict]:

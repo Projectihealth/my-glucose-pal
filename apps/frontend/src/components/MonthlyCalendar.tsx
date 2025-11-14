@@ -208,8 +208,8 @@ export const MonthlyCalendar = ({ selectedDay, onSelectDay }: MonthlyCalendarPro
 
             const summary = cell.summary;
             const isSelected = selectedDay === cell.iso;
-            const showStar = getAchievement(summary, cell.meals, cell.activity);
-            const title = summary ? `${summary.tir.toFixed(0)}% in range` : "No CGM data";
+            const showStar = getAchievement(cell.summary, cell.meals, cell.activity);
+            const title = cell.summary ? `${cell.summary.tir.toFixed(0)}% in range` : "No CGM data";
 
             const hasLogs = cell.meals > 0 || cell.activity > 0;
 
@@ -277,7 +277,7 @@ export const MonthlyCalendar = ({ selectedDay, onSelectDay }: MonthlyCalendarPro
                 <TooltipTrigger asChild>{content}</TooltipTrigger>
                 <TooltipContent className="text-xs">
                   <p className="font-medium">{title}</p>
-                  <p>Avg: {summary ? `${summary.avgGlucose.toFixed(0)} mg/dL` : "--"}</p>
+                  <p>Avg: {cell.summary ? `${cell.summary.avgGlucose.toFixed(0)} mg/dL` : "--"}</p>
                   <p>Meals logged: {cell.meals}</p>
                   <p>Activity minutes: {cell.activity}</p>
                 </TooltipContent>

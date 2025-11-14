@@ -141,6 +141,7 @@ export const DayTimeline = ({ dayUtc, dayLocal }: DayTimelineProps) => {
     medicationName?: string;
     dose?: string;
     note?: string;
+    timestamp?: string;
   }>({
     title: "",
     category: "food",
@@ -157,6 +158,11 @@ export const DayTimeline = ({ dayUtc, dayLocal }: DayTimelineProps) => {
     const log = logs.find(l => l.id === item.id);
     if (!log) return;
 
+    // Convert UTC timestamp to local datetime-local format
+    const date = new Date(log.timestamp);
+    const local = new Date(date.getTime() - date.getTimezoneOffset() * 60 * 1000);
+    const datetimeLocal = local.toISOString().slice(0, 16);
+
     setEditForm({
       title: log.title,
       category: log.category,
@@ -164,6 +170,7 @@ export const DayTimeline = ({ dayUtc, dayLocal }: DayTimelineProps) => {
       medicationName: log.medicationName,
       dose: log.dose,
       note: log.note,
+      timestamp: datetimeLocal,
     });
     setEditingId(item.id);
   };
@@ -174,7 +181,14 @@ export const DayTimeline = ({ dayUtc, dayLocal }: DayTimelineProps) => {
   };
 
   const handleSave = async (id: string) => {
-    const result = await updateLog(id, editForm);
+    // Convert local datetime to UTC ISO string if timestamp was edited
+    const updates = { ...editForm };
+    if (updates.timestamp) {
+      const localDate = new Date(updates.timestamp);
+      updates.timestamp = localDate.toISOString();
+    }
+
+    const result = await updateLog(id, updates);
     if (result) {
       toast({
         title: "Log updated",
@@ -247,20 +261,17 @@ export const DayTimeline = ({ dayUtc, dayLocal }: DayTimelineProps) => {
             <div
               key={kind}
               className={cn(
-                "rounded-2xl border border-border/70 bg-muted/30 p-3 text-sm flex items-center justify-between",
+                "rounded-2xl border border-border/70 bg-muted/30 p-3 text-sm flex items-center gap-2",
                 count === 0 && "opacity-50",
               )}
             >
-              <div className="flex items-center gap-2">
-                <span className={cn("inline-flex h-8 w-8 items-center justify-center rounded-xl", config.badgeClass)}>
-                  <config.icon className="w-4 h-4" />
-                </span>
-                <div>
-                  <p className="font-semibold">{config.label}</p>
-                  <p className="text-xs text-muted-foreground">{count ? `${count} log${count > 1 ? "s" : ""}` : "No logs"}</p>
-                </div>
+              <span className={cn("inline-flex h-8 w-8 items-center justify-center rounded-xl", config.badgeClass)}>
+                <config.icon className="w-4 h-4" />
+              </span>
+              <div>
+                <p className="font-semibold">{config.label}</p>
+                <p className="text-xs text-muted-foreground">{count ? `${count} log${count > 1 ? "s" : ""}` : "No logs"}</p>
               </div>
-              <span className="text-xs text-muted-foreground">{count ? "Tracked" : "Pending"}</span>
             </div>
           );
         })}
@@ -293,6 +304,17 @@ export const DayTimeline = ({ dayUtc, dayLocal }: DayTimelineProps) => {
                         id={`edit-title-${item.id}`}
                         value={editForm.title}
                         onChange={(e) => setEditForm({ ...editForm, title: e.target.value })}
+                        className="h-8 text-sm"
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor={`edit-timestamp-${item.id}`} className="text-xs">Time</Label>
+                      <Input
+                        id={`edit-timestamp-${item.id}`}
+                        type="datetime-local"
+                        value={editForm.timestamp || ""}
+                        onChange={(e) => setEditForm({ ...editForm, timestamp: e.target.value })}
                         className="h-8 text-sm"
                       />
                     </div>

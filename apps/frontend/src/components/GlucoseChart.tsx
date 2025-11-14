@@ -117,7 +117,28 @@ export const GlucoseChart = ({ selectedDay, onDayChange }: GlucoseChartProps) =>
   const forecastNote = copy.forecastNote ?? "We’ll surface tailored guidance once new insights are available.";
   const activityDots = useMemo(() => {
     if (!resolvedDay || chartData.length === 0) return [];
-    const dayLogs = logs.filter((log) => log.day === resolvedDay);
+
+    // Filter logs by local day to match calendar behavior
+    // Convert resolvedDay (UTC) to local day for comparison
+    const resolvedLocalDay = new Intl.DateTimeFormat("en-CA", {
+      timeZone: preferences.timezone,
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    }).format(new Date(`${resolvedDay}T00:00:00Z`));
+
+    const dayLogs = logs.filter((log) => {
+      // Convert log timestamp to local day
+      const logDate = new Date(log.timestamp);
+      const localDay = new Intl.DateTimeFormat("en-CA", {
+        timeZone: preferences.timezone,
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+      }).format(logDate);
+      return localDay === resolvedLocalDay;
+    });
+
     if (!dayLogs.length) return [];
 
     const categoryColors: Record<string, string> = {
@@ -150,7 +171,7 @@ export const GlucoseChart = ({ selectedDay, onDayChange }: GlucoseChartProps) =>
         source: "activity" as const,
       };
     });
-  }, [resolvedDay, chartData, logs, latestValue]);
+  }, [resolvedDay, chartData, logs, latestValue, preferences.timezone]);
 
   return (
     <section className="px-6 py-8 bg-white">

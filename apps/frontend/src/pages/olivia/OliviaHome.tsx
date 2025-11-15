@@ -29,7 +29,25 @@ function OliviaTab({ onNavigate }: { onNavigate: (view: 'text' | 'voice' | 'vide
 
       {/* Chat Options */}
       <div className="space-y-3 pt-2">
-        {/* Voice Chat Button - Featured First */}
+        {/* Video Chat Button - Featured First */}
+        <button
+          onClick={() => onNavigate('video')}
+          className="w-full bg-white rounded-3xl p-5 shadow-sm border border-gray-100 hover:shadow-md transition-all active:scale-[0.98]"
+        >
+          <div className="flex items-center gap-4">
+            <div className="w-14 h-14 rounded-full bg-gradient-to-br from-[#1ED6FF] via-[#1E90FF] to-[#1E5AA6] flex items-center justify-center flex-shrink-0 shadow-md">
+              <Video className="w-7 h-7 text-white" />
+            </div>
+            <div className="text-left flex-1">
+              <h3 className="text-gray-800 mb-1">Video Chat</h3>
+              <p className="text-gray-500">
+                Face-to-face interaction with visual support
+              </p>
+            </div>
+          </div>
+        </button>
+
+        {/* Voice Chat Button */}
         <button
           onClick={() => onNavigate('voice')}
           className="w-full bg-white rounded-3xl p-5 shadow-sm border border-gray-100 hover:shadow-md transition-all active:scale-[0.98]"
@@ -60,24 +78,6 @@ function OliviaTab({ onNavigate }: { onNavigate: (view: 'text' | 'voice' | 'vide
               <h3 className="text-gray-800 mb-1">Text Chat</h3>
               <p className="text-gray-500">
                 Message Olivia about your health
-              </p>
-            </div>
-          </div>
-        </button>
-
-        {/* Video Chat Button */}
-        <button
-          onClick={() => onNavigate('video')}
-          className="w-full bg-white rounded-3xl p-5 shadow-sm border border-gray-100 hover:shadow-md transition-all active:scale-[0.98]"
-        >
-          <div className="flex items-center gap-4">
-            <div className="w-14 h-14 rounded-full bg-gradient-to-br from-[#1ED6FF] via-[#1E90FF] to-[#1E5AA6] flex items-center justify-center flex-shrink-0 shadow-md">
-              <Video className="w-7 h-7 text-white" />
-            </div>
-            <div className="text-left flex-1">
-              <h3 className="text-gray-800 mb-1">Video Chat</h3>
-              <p className="text-gray-500">
-                Face-to-face interaction with visual support
               </p>
             </div>
           </div>

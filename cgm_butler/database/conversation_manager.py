@@ -117,87 +117,6 @@ class ConversationManager:
         finally:
             conn.close()
     
-    def save_retell_conversation(
-        self,
-        user_id: str,
-        retell_call_id: str,
-        retell_agent_id: str,
-        call_status: str,
-        call_type: str,
-        started_at: str,
-        transcript: str,
-        transcript_object: List[Dict],
-        ended_at: Optional[str] = None,
-        duration_seconds: Optional[float] = None,
-        call_cost: Optional[Dict] = None,
-        disconnection_reason: Optional[str] = None,
-        recording_url: Optional[str] = None,
-        properties: Optional[Dict] = None,
-        metadata: Optional[Dict] = None
-    ) -> str:
-        """
-        保存 Retell Voice Chat 对话
-
-        Args:
-            user_id: 用户ID
-            retell_call_id: Retell Call ID
-            retell_agent_id: Retell Agent ID
-            call_status: 通话状态 (active, ended, error)
-            call_type: 通话类型 (web_call, phone_call)
-            started_at: 开始时间戳
-            transcript: 纯文本 transcript
-            transcript_object: 完整 transcript 对象（List[Dict]）
-            ended_at: 结束时间戳
-            duration_seconds: 通话时长（秒）
-            call_cost: 通话费用（Dict）
-            disconnection_reason: 断开连接原因
-            recording_url: 录音文件 URL
-            properties: 属性字典
-            metadata: 元数据字典
-
-        Returns:
-            对话ID
-        """
-        conversation_id = str(uuid.uuid4())
-
-        conn = self._get_connection()
-        try:
-            cursor = conn.cursor()
-
-            cursor.execute('''
-            INSERT INTO conversations (
-                conversation_id, user_id, conversation_type, conversation_name,
-                retell_call_id, retell_agent_id, call_status, call_type,
-                started_at, ended_at, duration_seconds,
-                call_cost, disconnection_reason,
-                transcript, transcript_object, recording_url,
-                properties, metadata, status
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            ''', (
-                conversation_id, user_id, 'retell_voice', f'Voice Call - {retell_call_id[:10]}',
-                retell_call_id, retell_agent_id, call_status, call_type,
-                started_at, ended_at, duration_seconds,
-                json.dumps(call_cost or {}, ensure_ascii=False),
-                disconnection_reason,
-                transcript,
-                json.dumps(transcript_object, ensure_ascii=False),
-                recording_url,
-                json.dumps(properties or {}),
-                json.dumps(metadata or {}),
-                'ended'  # Voice calls are saved after they end
-            ))
-
-            conn.commit()
-            print(f"✅ Retell Voice 对话已保存: {conversation_id}")
-            return conversation_id
-
-        except sqlite3.Error as e:
-            print(f"❌ 保存 Retell Voice 对话失败: {e}")
-            conn.rollback()
-            raise
-        finally:
-            conn.close()
-
     def save_gpt_conversation(
         self,
         user_id: str,
@@ -284,21 +203,8 @@ class ConversationManager:
             
             if row:
                 result = dict(row)
-                # 解析 JSON 字段（根据对话类型）
-                conv_type = result.get('conversation_type')
-
-                # Voice Chat 的 transcript 是纯文本，不需要 JSON 解析
-                if conv_type == 'retell_voice':
-                    # transcript 保持为纯文本
-                    # transcript_object 需要 JSON 解析
-                    if result.get('transcript_object'):
-                        result['transcript_object'] = json.loads(result['transcript_object'])
-                    if result.get('call_cost'):
-                        result['call_cost'] = json.loads(result['call_cost'])
-                else:
-                    # Video Chat 和 GPT Chat 的 transcript 是 JSON
-                    result['transcript'] = json.loads(result['transcript']) if result['transcript'] else []
-
+                # 解析 JSON 字段
+                result['transcript'] = json.loads(result['transcript']) if result['transcript'] else []
                 result['properties'] = json.loads(result['properties']) if result['properties'] else {}
                 result['metadata'] = json.loads(result['metadata']) if result['metadata'] else {}
                 return result
@@ -352,21 +258,8 @@ class ConversationManager:
             
             for row in rows:
                 result = dict(row)
-                # 解析 JSON 字段（根据对话类型）
-                conv_type = result.get('conversation_type')
-
-                # Voice Chat 的 transcript 是纯文本，不需要 JSON 解析
-                if conv_type == 'retell_voice':
-                    # transcript 保持为纯文本
-                    # transcript_object 需要 JSON 解析
-                    if result.get('transcript_object'):
-                        result['transcript_object'] = json.loads(result['transcript_object'])
-                    if result.get('call_cost'):
-                        result['call_cost'] = json.loads(result['call_cost'])
-                else:
-                    # Video Chat 和 GPT Chat 的 transcript 是 JSON
-                    result['transcript'] = json.loads(result['transcript']) if result['transcript'] else []
-
+                # 解析 JSON 字段
+                result['transcript'] = json.loads(result['transcript']) if result['transcript'] else []
                 result['properties'] = json.loads(result['properties']) if result['properties'] else {}
                 result['metadata'] = json.loads(result['metadata']) if result['metadata'] else {}
                 results.append(result)
@@ -406,25 +299,11 @@ class ConversationManager:
             
             for row in rows:
                 result = dict(row)
-                # 解析 JSON 字段（根据对话类型）
-                conv_type = result.get('conversation_type')
-
-                # Voice Chat 的 transcript 是纯文本，不需要 JSON 解析
-                if conv_type == 'retell_voice':
-                    # transcript 保持为纯文本
-                    # transcript_object 需要 JSON 解析
-                    if result.get('transcript_object'):
-                        result['transcript_object'] = json.loads(result['transcript_object'])
-                    if result.get('call_cost'):
-                        result['call_cost'] = json.loads(result['call_cost'])
-                else:
-                    # Video Chat 和 GPT Chat 的 transcript 是 JSON
-                    result['transcript'] = json.loads(result['transcript']) if result['transcript'] else []
-
+                result['transcript'] = json.loads(result['transcript']) if result['transcript'] else []
                 result['properties'] = json.loads(result['properties']) if result['properties'] else {}
                 result['metadata'] = json.loads(result['metadata']) if result['metadata'] else {}
                 results.append(result)
-
+            
             return results
             
         finally:

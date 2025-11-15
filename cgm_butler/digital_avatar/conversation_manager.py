@@ -19,20 +19,18 @@ from .prompt_loader import (
 
 class ConversationManager:
     """Manages conversations with the digital avatar."""
-
-    def __init__(self, tavus_api_key: Optional[str] = None, persona_id: str = "p754b367b5f0", replica_id: str = "r9fa0878977a"):
+    
+    def __init__(self, tavus_api_key: Optional[str] = None, persona_id: str = "p754b367b5f0"):
         """
         Initialize conversation manager.
-
+        
         Args:
             tavus_api_key: Tavus API key
             persona_id: Digital avatar persona ID
-            replica_id: Digital avatar replica ID
         """
         self.tavus_client = TavusClient(api_key=tavus_api_key)
         self.cgm_tools = CGMTools()
         self.persona_id = persona_id
-        self.replica_id = replica_id
         self.active_conversations = {}  # conversation_id -> user_id mapping
     
     def start_conversation(self, user_id: str, config: Optional[Dict] = None) -> Dict[str, Any]:
@@ -49,7 +47,7 @@ class ConversationManager:
         # Get user info to personalize the conversation
         user_info = self.cgm_tools.get_user_info(user_id)
 
-        # Build rich conversational context from local prompt files + user info
+        # Build conversational context from local prompt files + user info
         conversational_context = build_conversational_context(
             user_id=user_id,
             user_name=user_info.get("name", "User"),
@@ -60,20 +58,22 @@ class ConversationManager:
         # Build custom greeting
         custom_greeting = build_custom_greeting(user_info.get("name", "there"))
 
-        # Properties
-        properties = {
-            "language": config.get("language", "english") if config else "english",
-            "max_call_duration": 3600,
-            "enable_recording": False
+        # Default configuration for Tavus client
+        default_config = {
+            "context": conversational_context,
+            "tools": FUNCTION_DEFINITIONS,
+            "language": "en",
+            "custom_greeting": custom_greeting,
         }
+
+        # Merge with custom config
+        if config:
+            default_config.update(config)
 
         # Create conversation via Tavus API
         conversation = self.tavus_client.create_conversation(
-            replica_id=self.replica_id,
             persona_id=self.persona_id,
-            conversational_context=conversational_context,
-            custom_greeting=custom_greeting,
-            properties=properties
+            config=default_config
         )
         
         # Store conversation mapping

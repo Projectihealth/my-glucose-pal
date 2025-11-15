@@ -32,27 +32,72 @@ export async function createWebCall(userId: string): Promise<WebCallResponse> {
 }
 
 /**
+ * 保存通话数据的完整参数
+ */
+export interface SaveCallDataParams {
+  userId: string;
+  callId: string;
+  agentId: string;
+  callStatus?: string;
+  callType?: string;
+  startTimestamp: string;
+  endTimestamp: string;
+  callDuration: number;
+  transcript: string;
+  transcriptObject: TranscriptMessage[];
+  callCost?: {
+    total: number;
+    currency: string;
+    breakdown?: Record<string, number>;
+  };
+  disconnectionReason?: string;
+  recordingUrl?: string;
+  properties?: Record<string, any>;
+  metadata?: Record<string, any>;
+}
+
+/**
  * 保存通话数据（通话结束后调用）
  */
-export async function saveCallData(
-  callId: string,
-  transcript: TranscriptMessage[]
-): Promise<void> {
+export async function saveCallData(params: SaveCallDataParams): Promise<void> {
   try {
+    const payload = {
+      user_id: params.userId,
+      call_id: params.callId,
+      agent_id: params.agentId,
+      call_status: params.callStatus || 'ended',
+      call_type: params.callType || 'web_call',
+      start_timestamp: params.startTimestamp,
+      end_timestamp: params.endTimestamp,
+      call_duration: params.callDuration,
+      transcript: params.transcript,
+      transcript_object: params.transcriptObject,
+      call_cost: params.callCost,
+      disconnection_reason: params.disconnectionReason,
+      recording_url: params.recordingUrl,
+      properties: params.properties,
+      metadata: params.metadata,
+    };
+
+    console.log('💾 Saving call data to database:', {
+      callId: params.callId,
+      duration: params.callDuration,
+      messages: params.transcriptObject.length,
+    });
+
     await axios.post(
       `${MINERVA_BACKEND_URL}/intake/save-call-data`,
-      {
-        call_id: callId,
-        transcript_object: transcript,
-      },
+      payload,
       {
         headers: {
           'Content-Type': 'application/json',
         },
       }
     );
+
+    console.log('✅ Call data saved successfully');
   } catch (error) {
-    console.error('Failed to save call data:', error);
+    console.error('❌ Failed to save call data:', error);
     throw new Error('Failed to save call data');
   }
 }

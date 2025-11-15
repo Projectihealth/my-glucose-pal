@@ -4,7 +4,7 @@
  */
 
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { createWebCall, saveCallData } from '../../services/olivia/retellService';
+import { createWebCall, saveCallData, type SaveCallDataParams } from '../../services/olivia/retellService';
 import type { TranscriptMessage, CallStatus } from '../../types/olivia/retell';
 
 interface UseRetellCallResult {
@@ -143,6 +143,8 @@ export function useRetellCall(userId: string): UseRetellCallResult {
   
   const retellClientRef = useRef<any | null>(null);
   const callIdRef = useRef<string | null>(null);
+  const agentIdRef = useRef<string | null>(null);
+  const callStartTimeRef = useRef<string | null>(null);
   const durationIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   // 加载 Retell SDK
@@ -182,6 +184,8 @@ export function useRetellCall(userId: string): UseRetellCallResult {
       // 监听通话更新事件
       client.on('call_started', () => {
         console.log('📞 Call started');
+        // 记录通话开始时间
+        callStartTimeRef.current = new Date().toISOString();
         setCallStatus({ status: 'connected', callId: callIdRef.current || undefined });
         // 开始计时
         setDuration(0);
@@ -192,21 +196,53 @@ export function useRetellCall(userId: string): UseRetellCallResult {
 
       client.on('call_ended', async () => {
         console.log('📞 Call ended');
+        const endTime = new Date().toISOString();
         setCallStatus({ status: 'ended', callId: callIdRef.current || undefined });
+
         // 停止计时
         if (durationIntervalRef.current) {
           clearInterval(durationIntervalRef.current);
           durationIntervalRef.current = null;
         }
 
-        // 保存通话数据
-        if (callIdRef.current && transcript.length > 0) {
+        // 保存通话数据到数据库
+        if (callIdRef.current && agentIdRef.current && transcript.length > 0 && callStartTimeRef.current) {
           try {
-            await saveCallData(callIdRef.current, transcript);
-            console.log('💾 Call data saved successfully');
+            // 生成纯文本 transcript
+            const textTranscript = transcript
+              .map(msg => `${msg.role === 'agent' ? 'Olivia' : '用户'}: ${msg.content}`)
+              .join('\n');
+
+            // 准备保存数据
+            const saveParams: SaveCallDataParams = {
+              userId: userId,
+              callId: callIdRef.current,
+              agentId: agentIdRef.current,
+              callStatus: 'ended',
+              callType: 'web_call',
+              startTimestamp: callStartTimeRef.current,
+              endTimestamp: endTime,
+              callDuration: duration, // 使用实际计时的秒数
+              transcript: textTranscript,
+              transcriptObject: transcript,
+              // 可选字段 - 如果 Retell 提供这些数据，可以在这里添加
+              // callCost: callCostData,
+              // disconnectionReason: 'user_hangup',
+              // recordingUrl: recordingUrl,
+            };
+
+            await saveCallData(saveParams);
+            console.log('💾 Call data saved to database successfully');
           } catch (error) {
-            console.error('Failed to save call data:', error);
+            console.error('❌ Failed to save call data to database:', error);
           }
+        } else {
+          console.warn('⚠️ Missing required data for saving call:', {
+            hasCallId: !!callIdRef.current,
+            hasAgentId: !!agentIdRef.current,
+            hasTranscript: transcript.length > 0,
+            hasStartTime: !!callStartTimeRef.current,
+          });
         }
       });
 
@@ -294,6 +330,7 @@ export function useRetellCall(userId: string): UseRetellCallResult {
       console.log('🔑 Requesting access token...');
       const response = await createWebCall(userId);
       callIdRef.current = response.call_id;
+      agentIdRef.current = response.agent_id; // 保存 agent_id
 
       console.log('✅ Web call created:', response);
 

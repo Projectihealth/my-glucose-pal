@@ -1,0 +1,27 @@
+# CGM Butler 项目依赖
+
+# Python 版本要求
+# Python >= 3.7
+
+# 核心依赖
+flask>=2.0.0               # Web Dashboard
+flask-cors>=3.0.0          # CORS Support
+schedule>=1.1.0            # Pattern Identification Scheduler
+requests>=2.26.0           # HTTP Client for Tavus API
+openai>=1.0.0              # GPT-4o Chat Integration
+python-dotenv>=0.19.0      # Load environment variables from .env files
+
+# 内置库 (无需安装)
+# - sqlite3
+# - datetime
+# - random
+# - typing
+# - io
+# - sys
+
+# 未来可能需要的依赖 (待开发功能)
+# numpy>=1.21.0              # 数据分析
+# pandas>=1.3.0              # 数据处理
+# scikit-learn>=1.0.0        # 机器学习 (血糖预测)
+# matplotlib>=3.4.0          # 数据可视化
+

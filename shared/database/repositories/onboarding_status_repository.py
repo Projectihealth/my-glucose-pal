@@ -9,7 +9,7 @@ import json
 from typing import Dict, List, Optional
 from datetime import datetime
 
-from .base_repository import BaseRepository
+from .base import BaseRepository
 
 
 class OnboardingStatusRepository(BaseRepository):

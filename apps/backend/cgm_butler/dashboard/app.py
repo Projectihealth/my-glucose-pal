@@ -10,17 +10,28 @@ import sys
 import os
 from flask_cors import CORS
 
+# 添加项目根目录到路径 (用于 shared 模块)
+# app.py -> dashboard -> cgm_butler -> backend -> apps -> my-glucose-pal (5层)
+project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))))
+if project_root not in sys.path:
+    sys.path.insert(0, project_root)
+
+# 添加父目录到路径以便导入模块
+backend_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if backend_root not in sys.path:
+    sys.path.append(backend_root)
+
 # 加载环境变量（必须在其他导入之前）
 from dotenv import load_dotenv
-project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+# 优先使用项目根目录的 .env
 env_path = os.path.join(project_root, '.env')
+if not os.path.exists(env_path):
+    # 回退到 backend 目录的 .env
+    env_path = os.path.join(backend_root, '.env')
 load_dotenv(env_path)
 print(f"✅ 环境变量加载自: {env_path}")
 print(f"   TAVUS_API_KEY: {'已设置' if os.getenv('TAVUS_API_KEY') else '未设置'}")
 print(f"   OPENAI_API_KEY: {'已设置' if os.getenv('OPENAI_API_KEY') else '未设置'}")
-
-# 添加父目录到路径以便导入模块
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from database import CGMDatabase
 from pattern_identification import CGMPatternIdentifier
 from digital_avatar.api import avatar_bp, init_avatar_api

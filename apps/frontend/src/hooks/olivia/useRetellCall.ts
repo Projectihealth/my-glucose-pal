@@ -146,6 +146,7 @@ export function useRetellCall(userId: string): UseRetellCallResult {
   const agentIdRef = useRef<string | null>(null);
   const callStartTimeRef = useRef<string | null>(null);
   const durationIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const transcriptRef = useRef<TranscriptMessage[]>([]); // 用 ref 保存最新的 transcript
 
   // 加载 Retell SDK
   useEffect(() => {
@@ -205,13 +206,16 @@ export function useRetellCall(userId: string): UseRetellCallResult {
           durationIntervalRef.current = null;
         }
 
-        // 保存通话数据到数据库
-        if (callIdRef.current && agentIdRef.current && transcript.length > 0 && callStartTimeRef.current) {
+        // 保存通话数据到数据库 (使用 ref 中的最新 transcript)
+        const currentTranscript = transcriptRef.current;
+        if (callIdRef.current && agentIdRef.current && currentTranscript.length > 0 && callStartTimeRef.current) {
           try {
             // 生成纯文本 transcript
-            const textTranscript = transcript
+            const textTranscript = currentTranscript
               .map(msg => `${msg.role === 'agent' ? 'Olivia' : '用户'}: ${msg.content}`)
               .join('\n');
+
+            console.log(`💾 Saving call data with ${currentTranscript.length} transcript messages...`);
 
             // 准备保存数据
             const saveParams: SaveCallDataParams = {
@@ -224,7 +228,7 @@ export function useRetellCall(userId: string): UseRetellCallResult {
               endTimestamp: endTime,
               callDuration: duration, // 使用实际计时的秒数
               transcript: textTranscript,
-              transcriptObject: transcript,
+              transcriptObject: currentTranscript,
               // 可选字段 - 如果 Retell 提供这些数据，可以在这里添加
               // callCost: callCostData,
               // disconnectionReason: 'user_hangup',
@@ -232,7 +236,7 @@ export function useRetellCall(userId: string): UseRetellCallResult {
             };
 
             await saveCallData(saveParams);
-            console.log('💾 Call data saved to database successfully');
+            console.log('✅ Call data saved to database successfully');
           } catch (error) {
             console.error('❌ Failed to save call data to database:', error);
           }
@@ -240,7 +244,8 @@ export function useRetellCall(userId: string): UseRetellCallResult {
           console.warn('⚠️ Missing required data for saving call:', {
             hasCallId: !!callIdRef.current,
             hasAgentId: !!agentIdRef.current,
-            hasTranscript: transcript.length > 0,
+            hasTranscript: currentTranscript.length > 0,
+            transcriptLength: currentTranscript.length,
             hasStartTime: !!callStartTimeRef.current,
           });
         }
@@ -264,6 +269,7 @@ export function useRetellCall(userId: string): UseRetellCallResult {
             content: item.content,
             timestamp: item.timestamp || Date.now(),
           }));
+          transcriptRef.current = newTranscript; // 同时更新 ref
           setTranscript(newTranscript);
         }
       });

@@ -106,7 +106,7 @@ sleep 2
 # 2. 启动 Minerva 语音服务
 echo ""
 echo -e "${BLUE}2️⃣  Starting Minerva Voice Service (port 8000)...${NC}"
-cd "$PROJECT_ROOT/cgm_butler/minerva"
+cd "$PROJECT_ROOT/apps/minerva"
 
 # 检查是否有虚拟环境
 if [ -d "$PROJECT_ROOT/venv" ]; then

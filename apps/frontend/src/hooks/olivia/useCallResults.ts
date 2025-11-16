@@ -152,6 +152,7 @@ export function useCallResults({
       return;
     }
 
+    console.log('📊 Generating call results...', { callId, transcriptLength: transcript.length });
     setIsLoading(true);
     setError(undefined);
 
@@ -164,24 +165,37 @@ export function useCallResults({
 
       // 处理 Summary 结果
       if (summaryResult.status === 'fulfilled') {
-        setSummary(summaryResult.value);
+        console.log('✅ Summary generated:', summaryResult.value);
+        // 确保返回的数据结构完整
+        const summary = summaryResult.value || {};
+        setSummary({
+          data_quality: summary.data_quality || 'insufficient',
+          meals: summary.meals || {},
+          exercise: summary.exercise || 'Not mentioned',
+          sleep: summary.sleep || 'Not mentioned',
+          beverages: summary.beverages,
+          lifestyle: summary.lifestyle,
+          mental_health: summary.mental_health,
+          additional_notes: summary.additional_notes || 'No additional information available',
+        });
       } else {
-        console.error('Failed to generate summary:', summaryResult.reason);
+        console.error('❌ Failed to generate summary:', summaryResult.reason);
       }
 
       // 处理 Goal Analysis 结果
       if (goalResult.status === 'fulfilled') {
+        console.log('✅ Goal analysis generated:', goalResult.value);
         setGoalAnalysis(goalResult.value);
       } else {
-        console.error('Failed to generate goal analysis:', goalResult.reason);
+        console.error('❌ Failed to generate goal analysis:', goalResult.reason);
       }
 
       // 如果都失败了，设置错误
       if (summaryResult.status === 'rejected' && goalResult.status === 'rejected') {
-        setError('Failed to generate results');
+        setError('Failed to generate results. The conversation may have been too short.');
       }
     } catch (err) {
-      console.error('Error generating results:', err);
+      console.error('❌ Error generating results:', err);
       setError(err instanceof Error ? err.message : 'Unknown error');
     } finally {
       setIsLoading(false);

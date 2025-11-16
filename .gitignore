@@ -48,3 +48,10 @@ __pycache__/
 *.bak
 
 *.tar.gz
+
+# Storage directory (runtime data)
+storage/databases/*.db
+storage/logs/*.log
+storage/uploads/*
+!storage/uploads/.gitkeep
+!storage/logs/.gitkeep

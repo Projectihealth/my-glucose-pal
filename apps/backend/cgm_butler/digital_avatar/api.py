@@ -10,11 +10,20 @@ from typing import Dict, Any
 import os
 import sys
 
-# Add parent directory to path
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+# 添加项目根目录到路径 (用于 shared 模块)
+# api.py -> digital_avatar -> cgm_butler -> backend -> apps -> my-glucose-pal (5层)
+current_file = os.path.abspath(__file__)
+project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(current_file)))))
+if project_root not in sys.path:
+    sys.path.insert(0, project_root)
 
-from digital_avatar import ConversationManager, AvatarConfig
-from digital_avatar.gpt_chat import GPTChatManager
+# 使用相对导入 (当前目录)
+from . import ConversationManager, AvatarConfig
+from .gpt_chat import GPTChatManager
+from .memory_service import MemoryService
+
+# 使用新的 shared/database
+from shared.database import get_connection, ConversationRepository
 
 # Create Blueprint
 avatar_bp = Blueprint('avatar', __name__, url_prefix='/api/avatar')
@@ -22,6 +31,11 @@ avatar_bp = Blueprint('avatar', __name__, url_prefix='/api/avatar')
 # Initialize managers
 conversation_manager = None
 gpt_chat_manager = None
+memory_service = None
+
+# 数据库连接和 Repository
+db_conn = None
+conversation_repo = None
 
 
 def init_avatar_api(tavus_api_key: str = None, persona_id: str = None, replica_id: str = None, openai_api_key: str = None):
@@ -34,7 +48,7 @@ def init_avatar_api(tavus_api_key: str = None, persona_id: str = None, replica_i
         replica_id: Replica ID
         openai_api_key: OpenAI API key
     """
-    global conversation_manager, gpt_chat_manager
+    global conversation_manager, gpt_chat_manager, memory_service, db_conn, conversation_repo
 
     # Tavus conversation manager (for video avatar) - optional, will fail gracefully
     try:
@@ -60,6 +74,24 @@ def init_avatar_api(tavus_api_key: str = None, persona_id: str = None, replica_i
     except Exception as e:
         print(f"⚠️  Failed to initialize GPT chat: {e}")
         gpt_chat_manager = None
+    
+    # Memory service (for all chat types)
+    try:
+        memory_service = MemoryService(openai_api_key=openai_api_key or AvatarConfig.OPENAI_API_KEY)
+        print("✅ Memory service initialized successfully")
+    except Exception as e:
+        print(f"⚠️  Failed to initialize memory service: {e}")
+        memory_service = None
+    
+    # 数据库连接和 Repository (使用新的 shared/database)
+    try:
+        db_conn = get_connection()
+        conversation_repo = ConversationRepository(db_conn)
+        print("✅ Database repository initialized successfully")
+    except Exception as e:
+        print(f"❌ Failed to initialize database repository: {e}")
+        db_conn = None
+        conversation_repo = None
 
 
 @avatar_bp.route('/start', methods=['POST'])
@@ -183,17 +215,90 @@ def get_history(conversation_id: str):
 @avatar_bp.route('/end/<conversation_id>', methods=['POST'])
 def end_conversation(conversation_id: str):
     """
-    End a conversation.
+    End a Tavus video conversation and save to database.
+    
+    Request body (optional):
+        {
+            "user_id": "user_001"  // Required for saving to DB
+        }
     
     Returns:
         {
             "success": true,
             "conversation_id": "conv_123",
-            "message": "Conversation ended successfully"
+            "message": "Conversation ended successfully",
+            "db_conversation_id": "uuid",
+            "memory_processed": true,
+            "todos_created": 2
         }
     """
     try:
+        # 结束 Tavus 对话
         result = conversation_manager.end_conversation(conversation_id)
+        
+        # 尝试保存到数据库并处理 memory
+        data = request.get_json() or {}
+        user_id = data.get('user_id')
+        
+        if user_id and conversation_repo and conversation_manager:
+            try:
+                # 获取对话详情（包含 transcript）
+                tavus_details = conversation_manager.tavus_client.get_conversation(conversation_id)
+                
+                # 提取必要信息
+                transcript = tavus_details.get('transcript', [])
+                started_at = tavus_details.get('created_at')
+                ended_at = tavus_details.get('ended_at')
+                status = tavus_details.get('status', 'ended')
+                
+                # 保存到数据库 (使用新的 Repository)
+                db_conv_id = conversation_repo.save_tavus_conversation(
+                    user_id=user_id,
+                    tavus_conversation_id=conversation_id,
+                    tavus_conversation_url=tavus_details.get('conversation_url', ''),
+                    tavus_replica_id=tavus_details.get('replica_id', ''),
+                    tavus_persona_id=tavus_details.get('persona_id', ''),
+                    transcript=transcript,
+                    conversational_context=tavus_details.get('conversational_context', ''),
+                    custom_greeting=tavus_details.get('custom_greeting', ''),
+                    started_at=started_at,
+                    ended_at=ended_at,
+                    duration_seconds=tavus_details.get('duration_seconds'),
+                    status=status,
+                    shutdown_reason=tavus_details.get('shutdown_reason'),
+                    properties=tavus_details.get('properties'),
+                    metadata=tavus_details.get('metadata')
+                )
+                db_conn.commit()
+                
+                # 处理记忆和 TODO
+                memory_result = {"success": False}
+                if memory_service:
+                    try:
+                        # 获取用户信息
+                        from .cgm_tools import CGMTools
+                        cgm_tools = CGMTools()
+                        user_info = cgm_tools.get_user_info(user_id)
+                        user_name = user_info.get('name', 'User')
+                        
+                        memory_result = memory_service.process_conversation(
+                            user_id=user_id,
+                            conversation_id=db_conv_id,
+                            channel='tavus_video',
+                            transcript=transcript,
+                            user_name=user_name
+                        )
+                    except Exception as mem_error:
+                        print(f"⚠️  Memory processing failed (non-fatal): {mem_error}")
+                
+                result['db_conversation_id'] = db_conv_id
+                result['memory_processed'] = memory_result.get('success', False)
+                result['todos_created'] = memory_result.get('todos_count', 0)
+                
+            except Exception as db_error:
+                print(f"⚠️  Database save failed (non-fatal): {db_error}")
+                result['db_save_error'] = str(db_error)
+        
         return jsonify(result)
         
     except Exception as e:

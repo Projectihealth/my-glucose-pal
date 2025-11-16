@@ -1,160 +1,132 @@
-# 🚀 Quick Start Guide
+# CGM Butler - 快速启动指南
 
-## 一键启动 My Glucose Pal with Olivia
+## 📋 环境变量配置
 
-### 📋 前提条件
+将以下内容复制到项目根目录的 `.env` 文件中:
 
-确保已安装：
-- ✅ Node.js (v18+)
-- ✅ Python (v3.8+)
-- ✅ npm 或 yarn
+```bash
+# ============================================
+# OpenAI API (文本对话 + AI 功能)
+# ============================================
+OPENAI_API_KEY=your_openai_api_key_here
 
-### 🎯 使用方法
+# ============================================
+# Tavus API (视频对话功能)
+# ============================================
+TAVUS_API_KEY=41a2bc2eb63741f2bd6f7d7a2974fc64
+TAVUS_PERSONA_ID=p4e7a065501a
+TAVUS_REPLICA_ID=r9fa0878977a
 
-#### 1️⃣ 启动所有服务
+# ============================================
+# Retell API (语音对话功能)
+# ============================================
+RETELL_API_KEY=key_e3b74c0de01a1ba9c20228131da1
+INTAKE_AGENT_ID=agent_c7d1cb2c279ec45bce38c95067
+INTAKE_LLM_ID=llm_e54c307ce74090cdfd06f682523b
+
+# ============================================
+# 数据库配置
+# ============================================
+CGM_DB_PATH=/Users/yijialiu/Desktop/my-glucose-pal/storage/databases/cgm_butler.db
+
+# ============================================
+# 服务配置
+# ============================================
+FLASK_ENV=development
+FLASK_DEBUG=True
+FLASK_PORT=5000
+MINERVA_PORT=8000
+CGM_BACKEND_URL=http://localhost:5000
+CORS_ORIGINS=http://localhost:5173,http://localhost:3000,http://localhost:8080
+```
+
+## 🚀 启动服务
+
+### 一键启动所有服务
 
 ```bash
 ./start-all.sh
 ```
 
-这个命令会自动启动：
-- 🔵 Flask 后端 (端口 5000)
-- 🟣 Minerva 语音服务 (端口 8000)
-- 🟢 前端应用 (端口 8080)
+### 停止所有服务
 
-启动完成后会自动打开浏览器访问 `http://localhost:8080`
-
-#### 2️⃣ 停止所有服务
-
-**方法 1：在启动终端按 `Ctrl+C`**
-
-**方法 2：运行停止脚本**
 ```bash
 ./stop-all.sh
 ```
 
-#### 3️⃣ 查看日志
+## 🌐 访问地址
 
-查看所有日志摘要：
-```bash
-./view-logs.sh all
-```
+- **前端界面**: http://localhost:8080
+- **Flask Backend**: http://localhost:5000
+- **Minerva Service**: http://localhost:8000
 
-查看特定服务的实时日志：
-```bash
-# Flask 后端
-./view-logs.sh flask
+## ✅ 功能测试
 
-# Minerva 语音服务
-./view-logs.sh minerva
-
-# 前端
-./view-logs.sh frontend
-```
-
----
-
-## 📱 访问应用
-
-启动后访问：
-- **主应用**: http://localhost:8080
-- **Olivia (Coach)**: http://localhost:8080/coach
-
-### Olivia 三种对话模式
-
-1. **💬 文本聊天** - GPT-4o 智能对话
-2. **🎤 语音对话** - Retell 实时语音通话
-3. **🎥 视频对话** - Tavus 数字人视频对话
-
----
-
-## 🔧 手动启动（调试用）
-
-如果需要单独启动某个服务进行调试：
-
-### Flask 后端
-```bash
-cd apps/backend/cgm_butler
-python dashboard/app.py
-```
-
-### Minerva 服务
-```bash
-cd cgm_butler/minerva
-uvicorn main:app --reload --port 8000
-```
-
-### 前端
-```bash
-cd apps/frontend
-npm run dev
-```
-
----
-
-## 📝 日志位置
-
-所有日志保存在 `logs/` 目录：
-- `logs/flask.log` - Flask 后端日志
-- `logs/minerva.log` - Minerva 服务日志
-- `logs/frontend.log` - 前端日志
-
----
-
-## ⚠️ 常见问题
-
-### 端口被占用
-
-如果看到 "Port already in use" 错误：
+### 1. Voice Chat (语音对话)
 
 ```bash
-# 查看占用端口的进程
-lsof -ti:5000
-lsof -ti:8000
-lsof -ti:8080
-
-# 杀掉进程（替换 PID）
-kill -9 <PID>
-
-# 或者运行停止脚本清理
-./stop-all.sh
+curl -X POST http://localhost:8000/intake/create-web-call \
+  -H "Content-Type: application/json" \
+  -d '{"user_id":"user_001"}'
 ```
 
-### 服务启动失败
-
-1. 检查日志文件
-2. 确保所有依赖已安装
-3. 确保环境变量配置正确
-
-### 前端依赖问题
+### 2. Video Chat (视频对话)
 
 ```bash
-cd apps/frontend
-rm -rf node_modules package-lock.json
-npm install
+curl -X POST http://localhost:5000/api/avatar/start \
+  -H "Content-Type: application/json" \
+  -d '{"user_id":"user_001"}'
 ```
 
----
+### 3. Text Chat (文本对话)
 
-## 🎉 开始使用
+访问前端界面 http://localhost:8080 并点击 "Text Chat" 卡片。
 
-1. 运行 `./start-all.sh`
-2. 浏览器会自动打开
-3. 点击底部导航的 "Olivia" tab
-4. 选择你想要的对话模式
-5. 开始和 Olivia 聊天！
+## 📊 数据库初始化
 
----
+如果数据库表缺失,运行:
 
-## 📚 更多文档
+```bash
+python3 -c "
+from shared.database import get_connection
+from shared.database.schema import create_all_tables
+conn = get_connection()
+create_all_tables(conn)
+conn.close()
+print('✅ 数据库表已创建')
+"
+```
 
-- [Integration Plan](CGM_BUTLER_INTEGRATION_PLAN.md) - 完整集成方案
-- [Integration Complete](INTEGRATION_COMPLETE.md) - 集成完成总结
-- [Integration Review](INTEGRATION_REVIEW_SUMMARY.md) - 审查总结
+## 🔧 故障排查
 
----
+### 服务无法启动
 
-**Enjoy using My Glucose Pal with Olivia! 🎉**
+1. 检查端口是否被占用:
+   ```bash
+   lsof -i :5000 -i :8000 -i :8080
+   ```
 
+2. 查看日志:
+   ```bash
+   tail -f logs/flask.log
+   tail -f logs/minerva.log
+   tail -f logs/frontend.log
+   ```
 
+### 数据库错误
 
+确保 `.env` 中的 `CGM_DB_PATH` 是绝对路径:
+
+```bash
+CGM_DB_PATH=/Users/yijialiu/Desktop/my-glucose-pal/storage/databases/cgm_butler.db
+```
+
+## 📝 注意事项
+
+1. **不要提交 `.env` 文件到 Git!** 它已经在 `.gitignore` 中。
+2. 首次启动可能需要等待 10-15 秒让所有服务完全启动。
+3. 如果修改了代码,需要重启服务才能生效。
+
+## 🎉 完成!
+
+现在你可以访问 http://localhost:8080 开始使用 CGM Butler 了!

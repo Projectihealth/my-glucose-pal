@@ -1,9 +1,15 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
-import { Activity, Apple, Moon, TrendingUp } from "lucide-react";
+import { Activity, Apple, Moon, TrendingUp, ChevronDown, ChevronUp } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { useUserPreferences } from "@/context/UserPreferencesContext";
 import { useGlucoseTrend } from "@/hooks/useGlucoseTrend";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 
 interface DashboardProps {
   selectedDay: string | null;
@@ -17,6 +23,9 @@ export const Dashboard = ({ selectedDay }: DashboardProps) => {
     selectedDay,
   );
   const stepMinutes = updateIntervalMinutes ?? 5;
+
+  const [snapshotOpen, setSnapshotOpen] = useState(false);
+  const [patternsOpen, setPatternsOpen] = useState(false);
 
   const timeInRange = useMemo(() => {
     if (!points.length) return null;
@@ -92,15 +101,30 @@ export const Dashboard = ({ selectedDay }: DashboardProps) => {
   }, [points, stepMinutes]);
 
   return (
-    <section className="px-6 py-8 bg-muted/40">
-      <div className="space-y-3">
-        <div className="space-y-1">
-          <h2 className="text-2xl font-bold">Daily Snapshot</h2>
-          <p className="text-sm text-muted-foreground">Key vitals from the selected day.</p>
-        </div>
+    <section className="px-6 pb-4 space-y-3">
+      {/* Daily Snapshot - Collapsible */}
+      <Collapsible open={snapshotOpen} onOpenChange={setSnapshotOpen}>
+        <Card className="rounded-3xl border-border/60 overflow-hidden">
+          <CollapsibleTrigger className="w-full p-5 flex items-center justify-between hover:bg-muted/50 transition-colors">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-2xl gradient-primary flex items-center justify-center">
+                <TrendingUp className="w-5 h-5 text-white" />
+              </div>
+              <div className="text-left">
+                <h3 className="text-lg font-semibold">Daily Snapshot</h3>
+                <p className="text-xs text-muted-foreground">Key vitals from the selected day</p>
+              </div>
+            </div>
+            {snapshotOpen ? (
+              <ChevronUp className="h-5 w-5 text-muted-foreground" />
+            ) : (
+              <ChevronDown className="h-5 w-5 text-muted-foreground" />
+            )}
+          </CollapsibleTrigger>
 
-        <div className="grid grid-cols-1 gap-4">
-          <Card className="p-5 rounded-3xl border-border/60">
+          <CollapsibleContent>
+            <div className="px-5 pb-5 pt-2 space-y-4">
+              <Card className="p-5 rounded-2xl border-border/60 bg-muted/20">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-2xl gradient-primary flex items-center justify-center">
@@ -122,67 +146,91 @@ export const Dashboard = ({ selectedDay }: DashboardProps) => {
             </div>
           </Card>
 
-          <Card className="p-5 rounded-3xl border-border/60">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-2xl bg-accent flex items-center justify-center">
-                  <Activity className="w-5 h-5 text-white" />
+              <Card className="p-5 rounded-2xl border-border/60 bg-muted/20">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-2xl bg-accent flex items-center justify-center">
+                      <Activity className="w-5 h-5 text-white" />
+                    </div>
+                    <div>
+                      <p className="text-xs uppercase tracking-wide text-muted-foreground">Active days</p>
+                      <p className="text-xl font-semibold">17</p>
+                    </div>
+                  </div>
+                  <span className="text-xs text-muted-foreground">This month</span>
                 </div>
-                <div>
-                  <p className="text-xs uppercase tracking-wide text-muted-foreground">Active days</p>
-                  <p className="text-xl font-semibold">10</p>
-                </div>
-              </div>
-              <span className="text-xs text-muted-foreground">This month</span>
-            </div>
-          </Card>
+              </Card>
 
-          <Card className="p-5 rounded-3xl border-border/60">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-2xl bg-secondary flex items-center justify-center">
-                  <Apple className="w-5 h-5 text-white" />
+              <Card className="p-5 rounded-2xl border-border/60 bg-muted/20">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-2xl bg-secondary flex items-center justify-center">
+                      <Apple className="w-5 h-5 text-white" />
+                    </div>
+                    <div>
+                      <p className="text-xs uppercase tracking-wide text-muted-foreground">Nutrition score</p>
+                      <p className="text-xl font-semibold">8 / 10</p>
+                    </div>
+                  </div>
+                  <span className="text-xs text-muted-foreground">Today</span>
                 </div>
-                <div>
-                  <p className="text-xs uppercase tracking-wide text-muted-foreground">Nutrition score</p>
-                  <p className="text-xl font-semibold">8 / 10</p>
-                </div>
-              </div>
-              <span className="text-xs text-muted-foreground">Today</span>
-            </div>
-          </Card>
+              </Card>
 
-          <Card className="p-5 rounded-3xl border-border/60">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-2xl bg-chart-4 flex items-center justify-center">
-                  <Moon className="w-5 h-5 text-white" />
+              <Card className="p-5 rounded-2xl border-border/60 bg-muted/20">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-2xl bg-chart-4 flex items-center justify-center">
+                      <Moon className="w-5 h-5 text-white" />
+                    </div>
+                    <div>
+                      <p className="text-xs uppercase tracking-wide text-muted-foreground">Sleep quality</p>
+                      <p className="text-xl font-semibold" style={{ color: "hsl(var(--chart-4))" }}>7.5h</p>
+                    </div>
+                  </div>
+                  <span className="text-xs text-muted-foreground">Average</span>
                 </div>
-                <div>
-                  <p className="text-xs uppercase tracking-wide text-muted-foreground">Sleep quality</p>
-                  <p className="text-xl font-semibold" style={{ color: "hsl(var(--chart-4))" }}>7.5h</p>
-                </div>
-              </div>
-              <span className="text-xs text-muted-foreground">Average</span>
+              </Card>
             </div>
-          </Card>
-        </div>
-
-        <Card className="p-5 rounded-3xl border-border/60">
-          <h3 className="text-lg font-semibold mb-4">Daily Patterns</h3>
-          <div className="space-y-4">
-            {segments.map((segment) => (
-              <div key={segment.label}>
-                <div className="flex justify-between text-xs mb-2">
-                  <span>{segment.label}</span>
-                  <span className="text-muted-foreground">{segment.status}</span>
-                </div>
-                <Progress value={segment.score} className="h-2" />
-              </div>
-            ))}
-          </div>
+          </CollapsibleContent>
         </Card>
-      </div>
+      </Collapsible>
+
+      {/* Daily Patterns - Collapsible */}
+      <Collapsible open={patternsOpen} onOpenChange={setPatternsOpen}>
+        <Card className="rounded-3xl border-border/60 overflow-hidden">
+          <CollapsibleTrigger className="w-full p-5 flex items-center justify-between hover:bg-muted/50 transition-colors">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-2xl bg-primary/10 flex items-center justify-center">
+                <Activity className="w-5 h-5 text-primary" />
+              </div>
+              <div className="text-left">
+                <h3 className="text-lg font-semibold">Daily Patterns</h3>
+                <p className="text-xs text-muted-foreground">Time-in-range by time of day</p>
+              </div>
+            </div>
+            {patternsOpen ? (
+              <ChevronUp className="h-5 w-5 text-muted-foreground" />
+            ) : (
+              <ChevronDown className="h-5 w-5 text-muted-foreground" />
+            )}
+          </CollapsibleTrigger>
+
+          <CollapsibleContent>
+            <div className="px-5 pb-5 pt-2 space-y-4">
+              {segments.map((segment) => (
+                <div key={segment.label}>
+                  <div className="flex justify-between text-xs mb-2">
+                    <span className="font-medium">{segment.label}</span>
+                    <span className="text-muted-foreground">{segment.status}</span>
+                  </div>
+                  <Progress value={segment.score} className="h-2" />
+                  <p className="text-xs text-muted-foreground mt-1">{segment.score}% in range</p>
+                </div>
+              ))}
+            </div>
+          </CollapsibleContent>
+        </Card>
+      </Collapsible>
     </section>
   );
 };

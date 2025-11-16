@@ -11,6 +11,7 @@ import {
 } from "@/components/ui/dialog";
 import { useUserPreferences } from "@/context/UserPreferencesContext";
 import { useGlucoseCalendarData } from "@/hooks/useGlucoseTrend";
+import ActivityLogButton from "@/components/ActivityLogButton";
 
 const Overview = () => {
   const { preferences } = useUserPreferences();
@@ -63,10 +64,17 @@ const Overview = () => {
   };
 
   return (
-    <div className="min-h-full space-y-8">
+    <div className="min-h-full space-y-8 relative">
       <GlucoseChart selectedDay={selectedDayUtc} onDayChange={handleChartDayChange} />
-      <MonthlyCalendar selectedDay={selectedDayLocal} onSelectDay={handleCalendarSelect} />
       <Dashboard selectedDay={selectedDayUtc} />
+      <MonthlyCalendar selectedDay={selectedDayLocal} onSelectDay={handleCalendarSelect} />
+
+      {/* Floating Activity Log Button */}
+      <div className="fixed bottom-[120px] left-1/2 -translate-x-1/2 z-30 pointer-events-none">
+        <div className="pointer-events-auto">
+          <ActivityLogButton />
+        </div>
+      </div>
 
       <Dialog open={isTimelineOpen && Boolean(timelineDay)} onOpenChange={(open) => {
         setIsTimelineOpen(open);

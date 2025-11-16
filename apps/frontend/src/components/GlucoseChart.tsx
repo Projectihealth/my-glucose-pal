@@ -117,8 +117,37 @@ export const GlucoseChart = ({ selectedDay, onDayChange }: GlucoseChartProps) =>
   const forecastNote = copy.forecastNote ?? "We’ll surface tailored guidance once new insights are available.";
   const activityDots = useMemo(() => {
     if (!resolvedDay || chartData.length === 0) return [];
-    const dayLogs = logs.filter((log) => log.day === resolvedDay);
+
+    // Filter logs by local day to match calendar behavior
+    // Convert resolvedDay (UTC) to local day for comparison
+    const resolvedLocalDay = new Intl.DateTimeFormat("en-CA", {
+      timeZone: preferences.timezone,
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    }).format(new Date(`${resolvedDay}T00:00:00Z`));
+
+    const dayLogs = logs.filter((log) => {
+      // Convert log timestamp to local day
+      const logDate = new Date(log.timestamp);
+      const localDay = new Intl.DateTimeFormat("en-CA", {
+        timeZone: preferences.timezone,
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+      }).format(logDate);
+      return localDay === resolvedLocalDay;
+    });
+
     if (!dayLogs.length) return [];
+
+    const categoryColors: Record<string, string> = {
+      food: "#f59e0b", // amber for food/meals
+      lifestyle: "#10b981", // emerald for lifestyle/activity
+      medication: "#8b5cf6", // purple for medication
+      sleep: "#475569", // slate for sleep
+      stress: "#ef4444", // rose for stress
+    };
 
     return dayLogs.map((log) => {
       let closest = chartData[0];
@@ -134,19 +163,15 @@ export const GlucoseChart = ({ selectedDay, onDayChange }: GlucoseChartProps) =>
 
       return {
         ...log,
+        minutesOfDayUtc: log.minutesOfDayUtc,
         glucose: closest?.glucose ?? latestValue,
         displayTitle: log.title,
         displayNote: log.note,
-        color:
-          log.category === "medication"
-            ? "#2563eb"
-            : log.category === "lifestyle"
-              ? "#10b981"
-              : "hsl(var(--primary))",
+        color: categoryColors[log.category] || "#6366f1",
         source: "activity" as const,
       };
     });
-  }, [resolvedDay, chartData, logs, latestValue]);
+  }, [resolvedDay, chartData, logs, latestValue, preferences.timezone]);
 
   return (
     <section className="px-6 py-8 bg-white">
@@ -245,17 +270,31 @@ export const GlucoseChart = ({ selectedDay, onDayChange }: GlucoseChartProps) =>
                       source?: string;
                       category?: string;
                       dose?: string;
+                      medicationName?: string;
+                      mealType?: string;
                     };
 
                     if (payload?.source === "activity") {
                       const headline = payload.displayTitle ?? "Logged activity";
                       const details: string[] = [];
-                      if (payload.category === "medication" && payload.dose) {
-                        details.push(`Dose: ${payload.dose}`);
+
+                      if (payload.category === "food" && payload.mealType) {
+                        details.push(`${payload.mealType.charAt(0).toUpperCase() + payload.mealType.slice(1)}`);
                       }
+
+                      if (payload.category === "medication") {
+                        if (payload.medicationName) {
+                          details.push(payload.medicationName);
+                        }
+                        if (payload.dose) {
+                          details.push(payload.dose);
+                        }
+                      }
+
                       if (payload.displayNote) {
                         details.push(payload.displayNote);
                       }
+
                       const subtitle = details.length ? details.join(" • ") : "Logged activity";
                       return [subtitle, headline];
                     }
@@ -273,12 +312,14 @@ export const GlucoseChart = ({ selectedDay, onDayChange }: GlucoseChartProps) =>
                     if (first?.source === "activity") {
                       const labelParts = [base];
                       if (first.category) {
-                        const categoryLabel =
-                          first.category === "medication"
-                            ? "Medication log"
-                            : first.category === "lifestyle"
-                              ? "Lifestyle log"
-                              : "Food log";
+                        const categoryLabels: Record<string, string> = {
+                          food: "Meal log",
+                          lifestyle: "Activity log",
+                          medication: "Medication log",
+                          sleep: "Sleep log",
+                          stress: "Stress log",
+                        };
+                        const categoryLabel = categoryLabels[first.category] || "Activity log";
                         labelParts.push(categoryLabel);
                       }
                       if (first.displayTitle) {
@@ -316,9 +357,22 @@ export const GlucoseChart = ({ selectedDay, onDayChange }: GlucoseChartProps) =>
                     />
                   ))}
                 {activityDots.length > 0 && (
-                  <Scatter data={activityDots} name="Logged activity">
+                  <Scatter
+                    data={activityDots}
+                    dataKey="glucose"
+                    name="Logged activity"
+                    fill="#8884d8"
+                    shape="circle"
+                    isAnimationActive={false}
+                  >
                     {activityDots.map((dot) => (
-                      <Cell key={dot.id} fill={dot.color} />
+                      <Cell
+                        key={dot.id}
+                        fill={dot.color}
+                        stroke="#fff"
+                        strokeWidth={2}
+                        r={6}
+                      />
                     ))}
                   </Scatter>
                 )}
@@ -326,15 +380,43 @@ export const GlucoseChart = ({ selectedDay, onDayChange }: GlucoseChartProps) =>
             </ResponsiveContainer>
           )}
 
-          <div className="mt-2 text-xs text-muted-foreground flex gap-3">
-            <div className="flex items-center gap-1">
-              <span className="inline-block w-3 h-2 rounded-sm bg-[hsla(var(--destructive))] opacity-30" />
-              {copy.lowLabel} (&lt; {LOW_THRESHOLD} mg/dL)
+          <div className="mt-2 text-xs text-muted-foreground space-y-2">
+            <div className="flex gap-3">
+              <div className="flex items-center gap-1">
+                <span className="inline-block w-3 h-2 rounded-sm bg-[hsla(var(--destructive))] opacity-30" />
+                {copy.lowLabel} (&lt; {LOW_THRESHOLD} mg/dL)
+              </div>
+              <div className="flex items-center gap-1">
+                <span className="inline-block w-3 h-2 rounded-sm bg-[hsla(var(--accent))] opacity-30" />
+                {copy.highLabel} (&gt; {HIGH_THRESHOLD} mg/dL)
+              </div>
             </div>
-            <div className="flex items-center gap-1">
-              <span className="inline-block w-3 h-2 rounded-sm bg-[hsla(var(--accent))] opacity-30" />
-              {copy.highLabel} (&gt; {HIGH_THRESHOLD} mg/dL)
-            </div>
+
+            {activityDots.length > 0 && (
+              <div className="flex flex-wrap gap-x-3 gap-y-1 pt-1 border-t border-border/40">
+                <span className="font-medium text-foreground/70">Activity logs:</span>
+                <div className="flex items-center gap-1">
+                  <span className="inline-block w-2 h-2 rounded-full" style={{ backgroundColor: "#f59e0b" }} />
+                  <span>Meal</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <span className="inline-block w-2 h-2 rounded-full" style={{ backgroundColor: "#10b981" }} />
+                  <span>Activity</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <span className="inline-block w-2 h-2 rounded-full" style={{ backgroundColor: "#8b5cf6" }} />
+                  <span>Medication</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <span className="inline-block w-2 h-2 rounded-full" style={{ backgroundColor: "#475569" }} />
+                  <span>Sleep</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <span className="inline-block w-2 h-2 rounded-full" style={{ backgroundColor: "#ef4444" }} />
+                  <span>Stress</span>
+                </div>
+              </div>
+            )}
           </div>
 
           <div className="mt-5 p-4 rounded-2xl bg-primary/5 text-primary flex items-start gap-3">

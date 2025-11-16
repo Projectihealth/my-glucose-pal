@@ -1,6 +1,7 @@
 import { createContext, ReactNode, useCallback, useContext, useEffect, useMemo, useState } from "react";
 
-export type ActivityLogCategory = "food" | "lifestyle" | "medication";
+export type ActivityLogCategory = "food" | "lifestyle" | "medication" | "sleep" | "stress";
+export type MealType = "breakfast" | "lunch" | "dinner" | "snack";
 
 export interface ActivityLogInput {
   title: string;
@@ -9,6 +10,7 @@ export interface ActivityLogInput {
   timestamp: string; // ISO timestamp (UTC)
   medicationName?: string;
   dose?: string;
+  mealType?: MealType;
 }
 
 export interface ActivityLogEntry extends ActivityLogInput {
@@ -21,6 +23,8 @@ export interface ActivityLogEntry extends ActivityLogInput {
 interface ActivityLogContextValue {
   logs: ActivityLogEntry[];
   addLog: (entry: ActivityLogInput) => Promise<ActivityLogEntry | null>;
+  deleteLog: (id: string) => Promise<boolean>;
+  updateLog: (id: string, updates: Partial<ActivityLogInput>) => Promise<ActivityLogEntry | null>;
   isLoading: boolean;
 }
 
@@ -50,6 +54,7 @@ type ActivityLogApiRow = {
   minutes_of_day_utc: number;
   medication_name?: string | null;
   dose?: string | null;
+  meal_type?: string | null;
   created_at?: string | null;
 };
 
@@ -63,6 +68,7 @@ const mapApiLogToEntry = (raw: ActivityLogApiRow): ActivityLogEntry => ({
   minutesOfDayUtc: Number(raw.minutes_of_day_utc ?? 0),
   medicationName: raw.medication_name ?? undefined,
   dose: raw.dose ?? undefined,
+  mealType: raw.meal_type as MealType | undefined,
   createdAt: raw.created_at ?? undefined,
 });
 
@@ -198,6 +204,12 @@ export const ActivityLogProvider = ({ children }: ActivityLogProviderProps) => {
 
   const addOfflineLog = useCallback((entry: ActivityLogInput): ActivityLogEntry => {
     const { iso, day, minutes } = parseTimestamp(entry.timestamp);
+    console.log('[ActivityLogContext] Creating offline log:', {
+      inputTimestamp: entry.timestamp,
+      parsedIso: iso,
+      parsedDay: day,
+      parsedMinutes: minutes
+    });
     const offlineEntry: ActivityLogEntry = {
       ...entry,
       id: generateId(),
@@ -208,6 +220,7 @@ export const ActivityLogProvider = ({ children }: ActivityLogProviderProps) => {
       dose: entry.category === "medication" ? entry.dose : undefined,
       createdAt: new Date().toISOString(),
     };
+    console.log('[ActivityLogContext] Offline log created:', offlineEntry);
     setOfflineLogs((prev) => {
       const next = [offlineEntry, ...prev];
       persistOfflineLogs(next);
@@ -231,6 +244,7 @@ export const ActivityLogProvider = ({ children }: ActivityLogProviderProps) => {
         timestampUtc: entry.timestamp,
         medicationName: entry.category === "medication" ? entry.medicationName ?? null : null,
         dose: entry.category === "medication" ? entry.dose ?? null : null,
+        mealType: entry.category === "food" ? entry.mealType ?? null : null,
       };
 
       try {
@@ -258,6 +272,115 @@ export const ActivityLogProvider = ({ children }: ActivityLogProviderProps) => {
     [userId, addOfflineLog],
   );
 
+  const deleteLog = useCallback(
+    async (id: string): Promise<boolean> => {
+      // Check if it's an offline log (UUID format)
+      const isOffline = id.includes("-");
+
+      if (isOffline) {
+        setOfflineLogs((prev) => {
+          const next = prev.filter((log) => log.id !== id);
+          persistOfflineLogs(next);
+          return next;
+        });
+        return true;
+      }
+
+      // Delete from backend
+      if (!API_BASE) {
+        console.warn("Cannot delete remote log without API");
+        return false;
+      }
+
+      try {
+        const response = await fetch(`${API_BASE}/api/activity-logs/${id}`, {
+          method: "DELETE",
+        });
+
+        if (!response.ok) {
+          throw new Error(`Failed to delete activity log (${response.status})`);
+        }
+
+        setRemoteLogs((prev) => prev.filter((log) => log.id !== id));
+        return true;
+      } catch (error) {
+        console.error("Failed to delete activity log", error);
+        return false;
+      }
+    },
+    [],
+  );
+
+  const updateLog = useCallback(
+    async (id: string, updates: Partial<ActivityLogInput>): Promise<ActivityLogEntry | null> => {
+      // Check if it's an offline log
+      const isOffline = id.includes("-");
+
+      if (isOffline) {
+        let updated: ActivityLogEntry | null = null;
+        setOfflineLogs((prev) => {
+          const next = prev.map((log) => {
+            if (log.id === id) {
+              const { iso, day, minutes } = updates.timestamp
+                ? parseTimestamp(updates.timestamp)
+                : { iso: log.timestamp, day: log.day, minutes: log.minutesOfDayUtc };
+
+              updated = {
+                ...log,
+                ...updates,
+                timestamp: iso,
+                day,
+                minutesOfDayUtc: minutes,
+              };
+              return updated;
+            }
+            return log;
+          });
+          persistOfflineLogs(next);
+          return next;
+        });
+        return updated;
+      }
+
+      // Update on backend
+      if (!API_BASE) {
+        console.warn("Cannot update remote log without API");
+        return null;
+      }
+
+      try {
+        const payload: Record<string, any> = {};
+        if (updates.title !== undefined) payload.title = updates.title;
+        if (updates.category !== undefined) payload.category = updates.category;
+        if (updates.note !== undefined) payload.note = updates.note;
+        if (updates.timestamp !== undefined) payload.timestampUtc = updates.timestamp;
+        if (updates.medicationName !== undefined) payload.medicationName = updates.medicationName;
+        if (updates.dose !== undefined) payload.dose = updates.dose;
+        if (updates.mealType !== undefined) payload.mealType = updates.mealType;
+
+        const response = await fetch(`${API_BASE}/api/activity-logs/${id}`, {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(payload),
+        });
+
+        if (!response.ok) {
+          throw new Error(`Failed to update activity log (${response.status})`);
+        }
+
+        const updated = mapApiLogToEntry((await response.json()) as ActivityLogApiRow);
+        setRemoteLogs((prev) => prev.map((log) => (log.id === id ? updated : log)));
+        return updated;
+      } catch (error) {
+        console.error("Failed to update activity log", error);
+        return null;
+      }
+    },
+    [],
+  );
+
   const logs = useMemo(() => {
     const merged = [...offlineLogs, ...remoteLogs];
     merged.sort((a, b) => (a.timestamp < b.timestamp ? 1 : -1));
@@ -268,9 +391,11 @@ export const ActivityLogProvider = ({ children }: ActivityLogProviderProps) => {
     () => ({
       logs,
       addLog,
+      deleteLog,
+      updateLog,
       isLoading,
     }),
-    [logs, addLog, isLoading],
+    [logs, addLog, deleteLog, updateLog, isLoading],
   );
 
   return <ActivityLogContext.Provider value={value}>{children}</ActivityLogContext.Provider>;

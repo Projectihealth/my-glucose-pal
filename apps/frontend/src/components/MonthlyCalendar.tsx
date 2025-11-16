@@ -127,13 +127,21 @@ export const MonthlyCalendar = ({ selectedDay, onSelectDay }: MonthlyCalendarPro
       const summary = summaryBundle?.summary;
       const meals = mealCounts[iso] ?? 0;
       const activity = activityMinutes[iso] ?? 0;
-      const dotClass = cn(
-        "w-2 h-2 rounded-full",
-        !summary && "bg-border",
-        summary && summary.tir >= 70 && "bg-emerald-500",
-        summary && summary.tir >= 50 && summary.tir < 70 && "bg-amber-400",
-        summary && summary.tir < 50 && "bg-rose-500",
+
+      // Background color classes based on TIR
+      const bgClass = cn(
+        !summary && "bg-muted/30",
+        summary && summary.tir >= 70 && "bg-emerald-500/90",
+        summary && summary.tir >= 50 && summary.tir < 70 && "bg-amber-400/90",
+        summary && summary.tir < 50 && "bg-rose-500/90",
       );
+
+      // Text color for contrast
+      const textClass = cn(
+        !summary && "text-foreground",
+        summary && "text-white font-semibold",
+      );
+
       return {
         key: iso,
         iso,
@@ -141,7 +149,8 @@ export const MonthlyCalendar = ({ selectedDay, onSelectDay }: MonthlyCalendarPro
         summary,
         meals,
         activity,
-        dotClass,
+        bgClass,
+        textClass,
       };
     });
   }, [viewDate, summaryByLocalDay, mealCounts, activityMinutes]);
@@ -197,29 +206,62 @@ export const MonthlyCalendar = ({ selectedDay, onSelectDay }: MonthlyCalendarPro
               return <div key={cell.key} className="h-16" />;
             }
 
+            const summary = cell.summary;
             const isSelected = selectedDay === cell.iso;
             const showStar = getAchievement(cell.summary, cell.meals, cell.activity);
             const title = cell.summary ? `${cell.summary.tir.toFixed(0)}% in range` : "No CGM data";
+
+            const hasLogs = cell.meals > 0 || cell.activity > 0;
 
             const content = (
               <button
                 type="button"
                 onClick={() => onSelectDay(cell.iso!)}
-                  className={cn(
-                    "relative flex h-16 flex-col items-center justify-center rounded-2xl border text-sm",
-                    isSelected ? "border-primary/60 bg-primary/5" : "border-border/60 bg-muted/40",
-                    cell.summary ? "hover:border-primary/50" : "opacity-60",
-                  )}
+                className={cn(
+                  "relative flex h-16 flex-col items-center justify-center rounded-2xl transition-all",
+                  cell.bgClass,
+                  isSelected && "ring-4 ring-primary/40 ring-offset-2 ring-offset-background scale-105",
+                  summary && "hover:scale-105 hover:shadow-lg",
+                  !summary && hasLogs && "opacity-100 border-2 border-primary/30",
+                  !summary && !hasLogs && "opacity-50",
+                )}
               >
-                <span className="text-sm font-semibold">{cell.label}</span>
-                <span className="mt-1 flex items-center gap-1">
-                  <span className={cell.dotClass} />
-                  {showStar && <Star className="w-3 h-3 text-primary" />}
-                </span>
-                {isSelected && (
-                  <span className="absolute inset-x-2 bottom-1 rounded-full bg-primary/10 text-[10px] text-primary">
-                    Daily timeline
+                <span className={cn("text-lg", cell.textClass)}>{cell.label}</span>
+                {summary && (
+                  <span className={cn("text-[10px] mt-0.5", cell.textClass, "opacity-90")}>
+                    {summary.tir.toFixed(0)}%
                   </span>
+                )}
+                {!summary && hasLogs && (
+                  <span className="text-[10px] mt-0.5 text-primary font-medium">
+                    {cell.meals + cell.activity > 0 && `${cell.meals + cell.activity} logs`}
+                  </span>
+                )}
+                {showStar && (
+                  <Star className="absolute top-1 right-1 w-3.5 h-3.5 text-yellow-300 fill-yellow-300" />
+                )}
+                {/* Activity badges - always show when logs exist */}
+                {hasLogs && (
+                  <div className="absolute bottom-1 flex gap-1">
+                    {cell.meals > 0 && (
+                      <div
+                        className={cn(
+                          "w-1.5 h-1.5 rounded-full",
+                          summary ? "bg-white/80" : "bg-orange-500"
+                        )}
+                        title={`${cell.meals} meal${cell.meals > 1 ? 's' : ''}`}
+                      />
+                    )}
+                    {cell.activity > 0 && (
+                      <div
+                        className={cn(
+                          "w-1.5 h-1.5 rounded-full",
+                          summary ? "bg-white/80" : "bg-blue-500"
+                        )}
+                        title={`Activity logged`}
+                      />
+                    )}
+                  </div>
                 )}
               </button>
             );
@@ -245,22 +287,34 @@ export const MonthlyCalendar = ({ selectedDay, onSelectDay }: MonthlyCalendarPro
         </div>
       </TooltipProvider>
 
-      <div className="mt-4 flex flex-wrap gap-4 text-[12px] text-muted-foreground">
-        <div className="flex items-center gap-2">
-          <span className="w-3 h-3 rounded-full bg-emerald-500" />
-          <span>Good day (&gt;70% TIR)</span>
+      <div className="mt-4 space-y-2">
+        <div className="flex flex-wrap gap-4 text-[12px] text-muted-foreground">
+          <div className="flex items-center gap-2">
+            <span className="w-3 h-3 rounded-full bg-emerald-500" />
+            <span>Good day (&gt;70% TIR)</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="w-3 h-3 rounded-full bg-amber-400" />
+            <span>Moderate (50-70%)</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="w-3 h-3 rounded-full bg-rose-500" />
+            <span>Challenging (&lt;50%)</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <Star className="w-3 h-3 text-primary" />
+            <span>Achievement day</span>
+          </div>
         </div>
-        <div className="flex items-center gap-2">
-          <span className="w-3 h-3 rounded-full bg-amber-400" />
-          <span>Moderate (50-70%)</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <span className="w-3 h-3 rounded-full bg-rose-500" />
-          <span>Challenging (&lt;50%)</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <Star className="w-3 h-3 text-primary" />
-          <span>Achievement day</span>
+        <div className="flex flex-wrap gap-4 text-[12px] text-muted-foreground">
+          <div className="flex items-center gap-2">
+            <span className="w-1.5 h-1.5 rounded-full bg-orange-500" />
+            <span>Meals logged</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="w-1.5 h-1.5 rounded-full bg-blue-500" />
+            <span>Activity logged</span>
+          </div>
         </div>
       </div>
     </Card>

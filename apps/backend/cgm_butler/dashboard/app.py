@@ -180,11 +180,12 @@ def create_activity_log():
     note = payload.get('note')
     medication_name = payload.get('medicationName') or payload.get('medication_name')
     dose = payload.get('dose')
+    meal_type = payload.get('mealType') or payload.get('meal_type')
 
     if not user_id:
         return jsonify({'error': 'userId is required'}), 400
-    if not category or category not in {'food', 'lifestyle', 'medication'}:
-        return jsonify({'error': 'category must be one of food, lifestyle, medication'}), 400
+    if not category or category not in {'food', 'lifestyle', 'medication', 'sleep', 'stress'}:
+        return jsonify({'error': 'category must be one of food, lifestyle, medication, sleep, stress'}), 400
     if not title:
         return jsonify({'error': 'title is required'}), 400
     if not timestamp_utc:
@@ -200,8 +201,42 @@ def create_activity_log():
                 note=note,
                 medication_name=medication_name,
                 dose=dose,
+                meal_type=meal_type,
             )
             return jsonify(created), 201
+    except ValueError as exc:
+        return jsonify({'error': str(exc)}), 400
+
+
+@app.route('/api/activity-logs/<int:log_id>', methods=['DELETE'])
+def delete_activity_log(log_id):
+    """删除活动日志"""
+    try:
+        with CGMDatabase(DB_PATH) as db:
+            db.delete_activity_log(log_id)
+            return jsonify({'success': True}), 200
+    except Exception as exc:
+        return jsonify({'error': str(exc)}), 400
+
+
+@app.route('/api/activity-logs/<int:log_id>', methods=['PUT'])
+def update_activity_log(log_id):
+    """更新活动日志"""
+    payload = request.get_json(silent=True) or {}
+
+    try:
+        with CGMDatabase(DB_PATH) as db:
+            updated = db.update_activity_log(
+                log_id,
+                title=payload.get('title'),
+                category=payload.get('category'),
+                note=payload.get('note'),
+                timestamp_utc=payload.get('timestampUtc') or payload.get('timestamp_utc'),
+                medication_name=payload.get('medicationName') or payload.get('medication_name'),
+                dose=payload.get('dose'),
+                meal_type=payload.get('mealType') or payload.get('meal_type'),
+            )
+            return jsonify(updated), 200
     except ValueError as exc:
         return jsonify({'error': str(exc)}), 400
 

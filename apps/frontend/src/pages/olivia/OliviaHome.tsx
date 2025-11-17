@@ -3,8 +3,9 @@ import { useState, useEffect } from 'react';
 import { Mic, Video, MessageCircle, Sparkles } from 'lucide-react';
 import { getConversationHistory } from '../../services/conversationsApi';
 import { processConversations } from '../../utils/conversationHelpers';
+import { getStoredUserId, USER_ID_CHANGE_EVENT } from '@/utils/userUtils';
 
-export function OliviaHome() {
+function OliviaHome() {
   const navigate = useNavigate();
 
   return (
@@ -32,14 +33,15 @@ function OliviaTab({ onNavigate }: { onNavigate: (view: 'voice' | 'video' | 'tex
   const [showAllHistory, setShowAllHistory] = useState(false);
   const [conversationHistory, setConversationHistory] = useState<ProcessedConversation[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [activeUserId, setActiveUserId] = useState(() => getStoredUserId());
 
   // Fetch conversation history
   useEffect(() => {
     const fetchHistory = async () => {
       try {
         setIsLoading(true);
-        // TODO: Get user_id from auth context
-        const userId = 'user_38377a3b';
+        const userId = getStoredUserId();
+        setActiveUserId(userId);
         const { conversations } = await getConversationHistory(userId, 10);
         const processed = processConversations(conversations);
         setConversationHistory(processed);
@@ -52,6 +54,18 @@ function OliviaTab({ onNavigate }: { onNavigate: (view: 'voice' | 'video' | 'tex
     };
 
     fetchHistory();
+  }, [activeUserId]);
+
+  useEffect(() => {
+    const handleUserChange = () => {
+      setActiveUserId(getStoredUserId());
+    };
+    window.addEventListener('storage', handleUserChange);
+    window.addEventListener(USER_ID_CHANGE_EVENT, handleUserChange);
+    return () => {
+      window.removeEventListener('storage', handleUserChange);
+      window.removeEventListener(USER_ID_CHANGE_EVENT, handleUserChange);
+    };
   }, []);
 
   const recentConversations = showAllHistory

@@ -360,3 +360,88 @@ async def update_llm_settings_endpoint(request: Request):
             detail=f"Internal server error: {str(e)}"
         )
 
+@intake_router.post("/save-analysis")
+async def save_analysis_endpoint(request: Request):
+    """
+    保存对话分析（summary 和 goal analysis）
+    
+    请求体:
+        {
+            "conversation_id": "uuid",
+            "call_summary": {...},
+            "goal_analysis": {...}
+        }
+    """
+    try:
+        body = await request.json()
+        conversation_id = body.get('conversation_id')
+        call_summary = body.get('call_summary')
+        goal_analysis = body.get('goal_analysis')
+        
+        if not conversation_id:
+            raise HTTPException(
+                status_code=400,
+                detail="conversation_id is required"
+            )
+        
+        logger.info(f"==== Saving analysis for conversation: {conversation_id}")
+        
+        # 使用 shared database
+        conn = get_connection()
+        
+        try:
+            conv_repo = ConversationRepository(conn)
+            
+            # 准备分析数据
+            summary_text = None
+            if call_summary:
+                # 将 call_summary 转换为可读文本
+                summary_parts = []
+                if call_summary.get('meals'):
+                    summary_parts.append(f"Meals: {call_summary['meals']}")
+                if call_summary.get('exercise'):
+                    summary_parts.append(f"Exercise: {call_summary['exercise']}")
+                if call_summary.get('sleep'):
+                    summary_parts.append(f"Sleep: {call_summary['sleep']}")
+                summary_text = " | ".join(summary_parts) if summary_parts else None
+            
+            # 提取 action items
+            action_items = []
+            if goal_analysis and goal_analysis.get('recommendations'):
+                action_items = [{'action': rec} for rec in goal_analysis['recommendations']]
+            
+            # 保存分析
+            analysis_id = conv_repo.save_analysis(
+                conversation_id=conversation_id,
+                summary=summary_text or goal_analysis.get('summary') if goal_analysis else None,
+                extracted_data={
+                    'call_summary': call_summary,
+                    'goal_analysis': goal_analysis
+                },
+                action_items=action_items,
+                analysis_model='gpt-4o'
+            )
+            
+            logger.info(f"==== Analysis saved with ID: {analysis_id}")
+            
+            return JSONResponse(
+                status_code=200,
+                content={
+                    "status": "success",
+                    "analysis_id": analysis_id,
+                    "message": "Analysis saved successfully"
+                }
+            )
+        
+        finally:
+            conn.close()
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"==== Error saving analysis: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail=f"Internal server error: {str(e)}"
+        )
+

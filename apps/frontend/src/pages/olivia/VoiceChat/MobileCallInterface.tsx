@@ -2,25 +2,15 @@ import { useState, useEffect, useRef } from 'react';
 import { X, Mic, MessageSquare, MicOff, Bot, UserCircle } from 'lucide-react';
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useRetellCall } from "../../../hooks/olivia/useRetellCall";
+import { getStoredUserId } from '@/utils/userUtils';
 
 interface MobileCallInterfaceProps {
   onBack: () => void;
   onCallEnded: (callId: string | null, transcript: any[]) => void;
 }
 
-// Helper function to get current user ID from localStorage
-const getCurrentUserId = () => {
-  if (typeof window === "undefined") return "user_001";
-  try {
-    return window.localStorage.getItem("currentUserId") ?? "user_001";
-  } catch (error) {
-    console.warn("Unable to read current user id from storage", error);
-    return "user_001";
-  }
-};
-
 export function MobileCallInterface({ onBack, onCallEnded }: MobileCallInterfaceProps) {
-  const userId = getCurrentUserId();
+  const userId = getStoredUserId();
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const [currentText, setCurrentText] = useState('');
   const [isMuted, setIsMuted] = useState(false);

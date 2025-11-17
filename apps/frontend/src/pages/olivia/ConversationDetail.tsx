@@ -135,7 +135,9 @@ function translateText(text: string): string {
   if (!text) return text;
   
   const translationMap: Record<string, string> = {
-    '饮食习惯': 'Diet',
+    '饮食习惯': 'Nutrition Habits',
+    '睡眠改善': 'Sleep Schedule',
+    '夜间饥饿的食物选择': 'Healthy Snacks',
     '早餐': 'Breakfast',
     '午餐': 'Lunch',
     '晚餐': 'Dinner',
@@ -148,6 +150,7 @@ function translateText(text: string): string {
     '食物': 'food',
     '吃': 'eat',
     '散步': 'walk',
+    '饱腹感': 'satiety',
     '锻炼': 'workout',
     '入睡': 'sleep',
     '放松': 'relax',
@@ -476,7 +479,7 @@ function ConversationDetailContent({ conversation, onBack }: {
   );
 }
 
-export function ConversationDetail() {
+function ConversationDetail() {
   const navigate = useNavigate();
   const { conversationId } = useParams<{ conversationId: string }>();
   const [conversation, setConversation] = useState<ConversationDetailType | null>(null);
@@ -552,11 +555,39 @@ export function ConversationDetail() {
     return date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
   };
 
+  // Extract topic using the same logic as conversation cards
+  const extractTopicFromData = (): string => {
+    // Check key topics first
+    if (conversation.key_topics && conversation.key_topics.length > 0) {
+      const topic = translateText(conversation.key_topics[0]);
+      return topic;
+    }
+
+    // Check recommendations for topic
+    if (conversation.extracted_data?.specific_recommendations?.[0]?.topic) {
+      const topic = conversation.extracted_data.specific_recommendations[0].topic;
+      const translated = translateText(topic);
+      return translated.split('（')[0].split('(')[0]; // Remove parentheses content
+    }
+
+    // Check commitments for context
+    if (conversation.extracted_data?.user_commitments?.[0]) {
+      const commitment = conversation.extracted_data.user_commitments[0];
+      if (commitment.includes('早餐') || commitment.includes('breakfast')) return 'Breakfast Nutrition';
+      if (commitment.includes('睡眠') || commitment.includes('sleep')) return 'Sleep Schedule';
+      if (commitment.includes('运动') || commitment.includes('exercise')) return 'Exercise Plan';
+      if (commitment.includes('散步') || commitment.includes('walk')) return 'Walking Routine';
+      if (commitment.includes('酸奶') || commitment.includes('yogurt') || commitment.includes('夜间') || commitment.includes('饥饿')) return 'Healthy Snacks';
+    }
+
+    return 'Health Discussion';
+  };
+
   const processedConversation: ProcessedConversationData = {
     id: conversation.id,
     type: conversation.type === 'retell_voice' ? 'voice' :
           conversation.type === 'tavus_video' ? 'video' : 'text',
-    topic: translateText(conversation.key_topics?.[0] || 'Health Discussion'),
+    topic: extractTopicFromData(),
     topicTag: extractTopicTag(conversation.key_topics, conversation.extracted_data),
     date: formatDate(conversation.started_at).split(',')[0],
     fullDate: formatDate(conversation.started_at),

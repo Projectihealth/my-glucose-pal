@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { MobileCallInterface } from './MobileCallInterface';
 import { CallResults } from './CallResults';
 
-export function VoiceChat() {
+function VoiceChat() {
   const [view, setView] = useState<'call' | 'results'>('call');
   const [callId, setCallId] = useState<string | null>(null);
   const [transcript, setTranscript] = useState<any[]>([]);

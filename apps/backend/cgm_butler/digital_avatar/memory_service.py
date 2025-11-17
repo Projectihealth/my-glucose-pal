@@ -169,57 +169,67 @@ class MemoryService:
         transcript_text = self._format_transcript(transcript, channel)
         
         if not transcript_text.strip():
-            return {'summary': '空对话', 'insights': None, 'key_topics': [], 'extracted_data': {}}
+            return {'summary': 'Empty conversation', 'insights': None, 'key_topics': [], 'extracted_data': {}}
         
-        prompt = f"""请分析以下健康助手与用户的对话记录，提取关键信息。
+        prompt = f"""Analyze the following health assistant conversation with the user and extract key information.
 
-对话记录：
+Conversation transcript:
 {transcript_text}
 
-请以 JSON 格式返回以下内容：
+Please return the following content in JSON format:
 {{
-  "summary": "本次对话的完整总结。要求：
-              1. 根据对话内容的丰富程度自适应调整长度（不要有固定句数限制）
-              2. 必须包含：讨论的主要主题、用户的问题/关注点、助手给出的具体建议（包括具体方案、食物、时间等细节）、达成的共识或行动计划
-              3. 如果对话涉及多个具体方案选择，必须列出每个方案的关键信息
-              4. 短对话(< 5轮)可以简短，长对话(> 15轮)可以详细，以完整表达为准",
+  "summary": "A complete summary of this conversation written in second person (You and Olivia). Requirements:
+              1. MUST use second person perspective: 'You and Olivia discussed...', 'You mentioned...', 'Olivia suggested...', 'You expressed...', 'You plan to...', etc.
+              2. NEVER use third person: avoid 'The user', 'The assistant', etc.
+              3. Adaptively adjust length based on conversation richness (no fixed sentence limit)
+              4. Must include: main topics discussed, your questions/concerns, specific recommendations from Olivia (including specific options, foods, timing, etc.), consensus or action plans you reached together
+              5. If the conversation involves multiple specific option choices, list key information for each option
+              6. Short conversations (< 5 exchanges) can be brief, long conversations (> 15 exchanges) can be detailed, aim for completeness
+              
+              Examples of correct tone:
+              ✅ 'You and Olivia discussed managing nighttime hunger...'
+              ✅ 'You shared that you tried eating yogurt at night...'
+              ✅ 'Olivia suggested small portions of yogurt...'
+              ✅ 'Together, you established a recovery plan...'
+              ❌ 'The user discussed managing nighttime hunger...'
+              ❌ 'The assistant suggested...'",
   
-  "insights": "从对话中发现的洞察、模式或趋势（如用户的行为习惯、情绪状态、健康问题的根本原因等）",
+  "insights": "Insights, patterns, or trends discovered from the conversation (e.g., user's behavioral habits, emotional state, root causes of health issues)",
   
-  "key_topics": ["话题1", "话题2", "话题3"],
+  "key_topics": ["Topic 1", "Topic 2", "Topic 3"],
   
   "extracted_data": {{
-    "mentioned_foods": ["食物1", "食物2", ...],
-    "mentioned_activities": ["活动1", "活动2", ...],
-    "glucose_concerns": ["关注点1", "关注点2", ...],
+    "mentioned_foods": ["food1", "food2", ...],
+    "mentioned_activities": ["activity1", "activity2", ...],
+    "glucose_concerns": ["concern1", "concern2", ...],
     "user_mood": "positive/neutral/negative",
     
     "specific_recommendations": [
       {{
-        "topic": "建议的主题（如'早餐改进'、'运动计划'）",
-        "options": ["具体方案1", "具体方案2"],
-        "rationale": "为什么这样建议（原理/好处）",
-        "implementation": "如何实施（可选）"
+        "topic": "Recommendation topic (e.g., 'Breakfast Improvement', 'Exercise Plan')",
+        "options": ["specific option 1", "specific option 2"],
+        "rationale": "Why this is recommended (principle/benefits)",
+        "implementation": "How to implement (optional)"
       }}
     ],
     
-    "user_commitments": ["用户承诺要做的事情1", "用户承诺要做的事情2"],
+    "user_commitments": ["What user committed to do 1", "What user committed to do 2"],
     
     "discussed_timing": {{
-      "breakfast": "时间描述",
-      "lunch": "时间描述",
-      "dinner": "时间描述"
+      "breakfast": "time description",
+      "lunch": "time description",
+      "dinner": "time description"
     }}
   }}
 }}
 
-只返回 JSON，不要其他文字。"""
+Return only JSON, no other text."""
         
         try:
             response = self.client.chat.completions.create(
                 model="gpt-4o",
                 messages=[
-                    {"role": "system", "content": "你是一个专业的健康对话分析助手，擅长从对话中提取结构化信息。"},
+                    {"role": "system", "content": "You are a professional health conversation analysis assistant, skilled at extracting structured information from conversations. Always respond in English. IMPORTANT: When writing summaries, always use second person perspective (You and Olivia) to create an engaging, personal tone for the user reading it. Never use third person like 'The user' or 'The assistant'."},
                     {"role": "user", "content": prompt}
                 ],
                 temperature=0.3,
@@ -230,9 +240,9 @@ class MemoryService:
             return result
             
         except Exception as e:
-            print(f"❌ 提取短期记忆失败: {e}")
+            print(f"❌ Extract session memory failed: {e}")
             return {
-                'summary': '对话总结失败',
+                'summary': 'Failed to summarize conversation',
                 'insights': None,
                 'key_topics': [],
                 'extracted_data': {}
@@ -257,34 +267,34 @@ class MemoryService:
         if not transcript_text.strip():
             return {}
         
-        prompt = f"""请分析以下对话，判断是否包含用户的长期习惯、目标、偏好等信息。
+        prompt = f"""Analyze the following conversation and determine if it contains information about the user's long-term habits, goals, preferences, etc.
 
-现有长期记忆：
+Existing long-term memory:
 {json.dumps(existing_memory or {}, ensure_ascii=False, indent=2)}
 
-本次对话：
+Current conversation:
 {transcript_text}
 
-如果对话中包含新的或更新的长期信息，请以 JSON 格式返回需要更新的字段：
+If the conversation contains new or updated long-term information, return the fields that need to be updated in JSON format:
 {{
-  "preferences": {{"偏好类别": "偏好内容"}},
-  "health_goals": {{"目标类别": "目标描述"}},
-  "habits": {{"习惯类别": "习惯描述"}},
-  "dietary_patterns": {{"饮食模式": "描述"}},
-  "exercise_patterns": {{"运动模式": "描述"}},
-  "stress_patterns": {{"压力模式": "描述"}},
-  "sleep_patterns": {{"睡眠模式": "描述"}},
-  "concerns": ["关注事项1", "关注事项2"]
+  "preferences": {{"preference category": "preference content"}},
+  "health_goals": {{"goal category": "goal description"}},
+  "habits": {{"habit category": "habit description"}},
+  "dietary_patterns": {{"diet pattern": "description"}},
+  "exercise_patterns": {{"exercise pattern": "description"}},
+  "stress_patterns": {{"stress pattern": "description"}},
+  "sleep_patterns": {{"sleep pattern": "description"}},
+  "concerns": ["concern 1", "concern 2"]
 }}
 
-如果没有需要更新的长期信息，返回空对象 {{}}。
-只返回 JSON，不要其他文字。"""
+If there is no long-term information to update, return an empty object {{}}.
+Return only JSON, no other text."""
         
         try:
             response = self.client.chat.completions.create(
                 model="gpt-4o",
                 messages=[
-                    {"role": "system", "content": "你是一个专业的健康信息提取助手，擅长识别用户的长期习惯和目标。"},
+                    {"role": "system", "content": "You are a professional health information extraction assistant, skilled at identifying users' long-term habits and goals. Always respond in English."},
                     {"role": "user", "content": prompt}
                 ],
                 temperature=0.3,
@@ -315,140 +325,137 @@ class MemoryService:
         if not transcript_text.strip():
             return []
         
-        prompt = f"""请分析以下健康助手与 {user_name} 的对话，提取双方达成共识的行动项（TODO）。
+        prompt = f"""Analyze the following health assistant conversation with {user_name} and extract action items (TODOs) that both parties agreed upon.
 
-对话记录：
+Conversation transcript:
 {transcript_text}
 
-请以 JSON 格式返回 TODO 列表：
+Please return TODO list in JSON format:
 {{
   "todos": [
     {{
-      "title": "清晰的行动描述（包含具体方案，用中文）",
-      "description": "补充说明（可选，通常为空）",
+      "title": "Clear action description (include specific options, in English)",
+      "description": "Additional notes (optional, usually empty)",
       "category": "diet/exercise/sleep/stress/medication/other",
-      "health_benefit": "为什么要做这个（健康好处/影响）",
-      "time_of_day": "执行时间段（HH:MM-HH:MM 格式）",
-      "time_description": "时间描述（如'上班前'、'晚饭后1小时'）",
-      "target_count": 目标次数,
+      "health_benefit": "Why do this (health benefits/impact)",
+      "time_of_day": "Execution time period (HH:MM-HH:MM format)",
+      "time_description": "Time description (e.g., 'Before work', 'After dinner')",
+      "target_count": target number,
       "current_count": 0,
       "status": "pending"
     }}
   ]
 }}
 
-【重要说明】
+【Important Instructions】
 
-1. **title（行动描述）**:
-   - 清晰描述要做什么，包含具体方案
-   - 如果有多个方案选择，用 "/" 或 "、" 分隔
-   - 例如：
-     ✅ "每天上班前吃营养早餐（希腊酸奶+坚果 / 提前煮好的鸡蛋）"
-     ✅ "每周运动3次，每次30分钟（快走/慢跑）"
-     ✅ "每晚11点前上床睡觉"
-     ❌ "改善早餐习惯"（太笼统）
-     ❌ "Prepare breakfast"（不要英文）
+1. **title (action description)**:
+   - Clearly describe what to do, including specific options
+   - If there are multiple option choices, separate with "/" or "or"
+   - Examples:
+     ✅ "Eat nutritious breakfast before work (Greek yogurt + nuts / pre-cooked eggs)"
+     ✅ "Exercise 3 times per week, 30 minutes each (brisk walking/jogging)"
+     ✅ "Go to bed before 11 PM every night"
+     ❌ "Improve breakfast habits" (too vague)
 
-2. **health_benefit（健康好处）**:
-   - 说明为什么要做这个，对健康有什么好处
-   - 强化用户的执行动力
-   - 例如：
-     ✅ "减少饥饿导致的血糖降低，稳定上午血糖水平"
-     ✅ "提高胰岛素敏感性，帮助控制血糖"
-     ✅ "改善睡眠质量，帮助血糖调节和代谢健康"
-     ❌ "对健康有好处"（太笼统）
+2. **health_benefit (health benefits)**:
+   - Explain why do this, what health benefits it provides
+   - Reinforce user's motivation to execute
+   - Examples:
+     ✅ "Reduce hunger-induced blood sugar drops, stabilize morning glucose levels"
+     ✅ "Improve insulin sensitivity, help control blood sugar"
+     ✅ "Improve sleep quality, help blood sugar regulation and metabolic health"
+     ❌ "Good for health" (too vague)
 
-3. **time_of_day（执行时间段）**:
-   - 格式: "HH:MM-HH:MM"（24小时制）
-   - 根据对话中提到的用户作息时间推断
-   - 例如：
-     - 早餐: "09:00-10:00"（如果用户说"起床后半小时"，推断起床时间）
-     - 午餐: "12:00-13:00"
-     - 晚餐: "19:00-20:00"
-     - 运动: "20:00-21:00"（如果说"晚饭后1小时"）
-     - 睡觉: "22:00-23:00"（如果说"11点前睡觉"）
-   - ⚠️ **重要：避免跨天时间**
-     - ❌ 错误: "23:00-01:00"（跨天了）
-     - ✅ 正确: "23:00-23:59"（只记录当天部分）
-     - ❌ 错误: "22:00-00:30"（跨天了）
-     - ✅ 正确: "22:00-23:59"（只记录当天部分）
-   - 如果对话中没有明确时间，根据常识和类别推断
-   - 如果是全天性任务（如"每天喝8杯水"），可以填 "全天"
+3. **time_of_day (execution time period)**:
+   - Format: "HH:MM-HH:MM" (24-hour format)
+   - Infer based on user's schedule mentioned in conversation
+   - Examples:
+     - Breakfast: "09:00-10:00" (if user says "half hour after waking up", infer wake time)
+     - Lunch: "12:00-13:00"
+     - Dinner: "19:00-20:00"
+     - Exercise: "20:00-21:00" (if says "1 hour after dinner")
+     - Sleep: "22:00-23:00" (if says "before 11 PM")
+   - ⚠️ **Important: Avoid cross-day times**
+     - ❌ Wrong: "23:00-01:00" (crosses day)
+     - ✅ Correct: "23:00-23:59" (only record same-day part)
+   - If no explicit time in conversation, infer based on common sense and category
+   - If all-day task (like "drink 8 glasses of water daily"), fill "All day"
 
-4. **time_description（时间描述）**:
-   - 用户友好的时间描述
-   - 例如：
-     ✅ "上班前"
-     ✅ "午餐时间"
-     ✅ "晚饭后1小时"
-     ✅ "睡前"
-     ✅ "周一、周三、周五晚上"
+4. **time_description (time description)**:
+   - User-friendly time description
+   - Examples:
+     ✅ "Before work"
+     ✅ "Lunchtime"
+     ✅ "1 hour after dinner"
+     ✅ "Before bed"
+     ✅ "Monday, Wednesday, Friday evenings"
 
 5. **description**:
-   - 通常为空（因为 title 已经包含了足够信息）
-   - 只在需要额外补充说明时使用
+   - Usually empty (title already contains enough information)
+   - Only use when additional clarification is needed
 
 6. **category**: 
-   - 必须是以下之一: diet, exercise, sleep, stress, medication, other
+   - Must be one of: diet, exercise, sleep, stress, medication, other
 
 7. **target_count**: 
-   - 本周目标次数（如"每周3次"则为3，"每天"则为7）
+   - Weekly target count (if "3 times per week" then 3, if "daily" then 7)
 
-8. **只提取明确达成共识的行动项**
+8. **Only extract action items with clear consensus**
 
-【完整示例】
+【Complete Examples】
 
-示例1（饮食 - 早餐）:
+Example 1 (Diet - Breakfast):
 {{
-  "title": "每天上班前吃营养早餐（希腊酸奶+坚果 / 提前煮好的鸡蛋）",
+  "title": "Eat nutritious breakfast before work (Greek yogurt + nuts / pre-cooked eggs)",
   "description": "",
   "category": "diet",
-  "health_benefit": "减少饥饿导致的血糖降低，稳定上午血糖水平",
+  "health_benefit": "Reduce hunger-induced blood sugar drops, stabilize morning glucose levels",
   "time_of_day": "09:00-10:00",
-  "time_description": "上班前",
+  "time_description": "Before work",
   "target_count": 7,
   "current_count": 0,
   "status": "pending"
 }}
 
-示例2（运动）:
+Example 2 (Exercise):
 {{
-  "title": "每周运动3次，每次30分钟（快走/慢跑）",
+  "title": "Exercise 3 times per week, 30 minutes each (brisk walking/jogging)",
   "description": "",
   "category": "exercise",
-  "health_benefit": "提高胰岛素敏感性，帮助控制血糖",
+  "health_benefit": "Improve insulin sensitivity, help control blood sugar",
   "time_of_day": "20:00-21:00",
-  "time_description": "晚饭后1小时",
+  "time_description": "1 hour after dinner",
   "target_count": 3,
   "current_count": 0,
   "status": "pending"
 }}
 
-示例3（睡眠）:
+Example 3 (Sleep):
 {{
-  "title": "每晚11点前上床睡觉",
+  "title": "Go to bed before 11 PM every night",
   "description": "",
   "category": "sleep",
-  "health_benefit": "改善睡眠质量，帮助血糖调节和代谢健康",
+  "health_benefit": "Improve sleep quality, help blood sugar regulation and metabolic health",
   "time_of_day": "22:30-23:00",
-  "time_description": "睡前",
+  "time_description": "Before bed",
   "target_count": 7,
   "current_count": 0,
   "status": "pending"
 }}
 
-【输出要求】
-- 只返回 JSON 格式，不要其他文字
-- 如果没有明确的 TODO，返回 {{"todos": []}}
-- 确保 JSON 格式正确，可以被解析
-- time_of_day 必须是 "HH:MM-HH:MM" 格式或 "全天"
+【Output Requirements】
+- Return only JSON format, no other text
+- If no clear TODOs, return {{"todos": []}}
+- Ensure JSON format is correct and parseable
+- time_of_day must be "HH:MM-HH:MM" format or "All day"
 """
         
         try:
             response = self.client.chat.completions.create(
                 model="gpt-4o",
                 messages=[
-                    {"role": "system", "content": "你是一个专业的行动项提取助手，擅长从对话中识别可执行的健康行动计划。"},
+                    {"role": "system", "content": "You are a professional action item extraction assistant, skilled at identifying executable health action plans from conversations. Always respond in English."},
                     {"role": "user", "content": prompt}
                 ],
                 temperature=0.3,

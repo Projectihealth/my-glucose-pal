@@ -148,6 +148,75 @@ class ConversationRepository(BaseRepository):
         return conversation_id
     
     # ============================================================
+    # Analysis Methods
+    # ============================================================
+    
+    def save_analysis(
+        self,
+        conversation_id: str,
+        summary: Optional[str] = None,
+        key_topics: Optional[List[str]] = None,
+        extracted_data: Optional[Dict] = None,
+        user_intents: Optional[List[str]] = None,
+        user_concerns: Optional[List[str]] = None,
+        user_sentiment: Optional[str] = None,
+        engagement_score: Optional[float] = None,
+        action_items: Optional[List[Dict]] = None,
+        follow_up_needed: bool = False,
+        analysis_model: str = 'gpt-4o',
+        analysis_timestamp: Optional[str] = None
+    ) -> int:
+        """Save conversation analysis to database."""
+        
+        self.execute('''
+        INSERT INTO conversation_analysis (
+            conversation_id, summary, key_topics, extracted_data,
+            user_intents, user_concerns, user_sentiment,
+            engagement_score, action_items, follow_up_needed,
+            analysis_model, analysis_timestamp
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ''', (
+            conversation_id,
+            summary,
+            json.dumps(key_topics or [], ensure_ascii=False),
+            json.dumps(extracted_data or {}, ensure_ascii=False),
+            json.dumps(user_intents or [], ensure_ascii=False),
+            json.dumps(user_concerns or [], ensure_ascii=False),
+            user_sentiment,
+            engagement_score,
+            json.dumps(action_items or [], ensure_ascii=False),
+            1 if follow_up_needed else 0,
+            analysis_model,
+            analysis_timestamp or datetime.now().isoformat()
+        ))
+        
+        self.commit()
+        return self.cursor.lastrowid
+    
+    def get_analysis(self, conversation_id: str) -> Optional[Dict]:
+        """Get conversation analysis by conversation ID."""
+        row = self.fetchone(
+            'SELECT * FROM conversation_analysis WHERE conversation_id = ?',
+            (conversation_id,)
+        )
+        
+        if row:
+            # Parse JSON fields
+            if row.get('key_topics'):
+                row['key_topics'] = json.loads(row['key_topics'])
+            if row.get('extracted_data'):
+                row['extracted_data'] = json.loads(row['extracted_data'])
+            if row.get('user_intents'):
+                row['user_intents'] = json.loads(row['user_intents'])
+            if row.get('user_concerns'):
+                row['user_concerns'] = json.loads(row['user_concerns'])
+            if row.get('action_items'):
+                row['action_items'] = json.loads(row['action_items'])
+            row['follow_up_needed'] = bool(row.get('follow_up_needed'))
+            
+        return row
+    
+    # ============================================================
     # Query Methods
     # ============================================================
     

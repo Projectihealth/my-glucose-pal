@@ -15,17 +15,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useUserPreferences } from "@/context/UserPreferencesContext";
 import type { SupportedLanguage } from "@/context/UserPreferencesContext";
 import { useToast } from "@/components/ui/use-toast";
-
-// Helper function to get current user ID
-const getCurrentUserId = () => {
-  if (typeof window === "undefined") return "user_001";
-  try {
-    return window.localStorage.getItem("currentUserId") ?? "user_001";
-  } catch (error) {
-    console.warn("Unable to read current user id from storage", error);
-    return "user_001";
-  }
-};
+import { getStoredUserId, setStoredUserId } from "@/utils/userUtils";
 
 interface User {
   user_id: string;
@@ -49,7 +39,7 @@ const Profile = () => {
   });
 
   // Account switching state
-  const [currentUserId, setCurrentUserId] = useState<string>(getCurrentUserId());
+  const [currentUserId, setCurrentUserId] = useState<string>(() => getStoredUserId());
   const [availableUsers, setAvailableUsers] = useState<User[]>([]);
   const [selectedUserId, setSelectedUserId] = useState<string>("");
   const [manualUserId, setManualUserId] = useState<string>("");
@@ -79,7 +69,8 @@ const Profile = () => {
     if (!userId || userId === currentUserId) return;
 
     try {
-      localStorage.setItem("currentUserId", userId);
+      setStoredUserId(userId);
+      setCurrentUserId(userId);
       toast({
         title: "Switching account...",
         description: `Switching to user: ${userId}`,

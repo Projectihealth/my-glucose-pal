@@ -138,7 +138,7 @@ def create_todo():
             # Get the created todo
             todo = todo_repo.get_by_id(todo_id)
 
-            return jsonify({'todo': todo}), 201
+            return jsonify({'todo_id': todo_id, 'todo': todo}), 201
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 

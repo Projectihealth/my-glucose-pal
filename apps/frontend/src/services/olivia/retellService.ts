@@ -59,7 +59,7 @@ export interface SaveCallDataParams {
 /**
  * 保存通话数据（通话结束后调用）
  */
-export async function saveCallData(params: SaveCallDataParams): Promise<void> {
+export async function saveCallData(params: SaveCallDataParams): Promise<string> {
   try {
     const payload = {
       user_id: params.userId,
@@ -85,7 +85,7 @@ export async function saveCallData(params: SaveCallDataParams): Promise<void> {
       messages: params.transcriptObject.length,
     });
 
-    await axios.post(
+    const response = await axios.post(
       `${MINERVA_BACKEND_URL}/intake/save-call-data`,
       payload,
       {
@@ -95,10 +95,44 @@ export async function saveCallData(params: SaveCallDataParams): Promise<void> {
       }
     );
 
-    console.log('✅ Call data saved successfully');
+    const conversationId = response.data.conversation_id;
+    console.log('✅ Call data saved successfully, conversation_id:', conversationId);
+    return conversationId;
   } catch (error) {
     console.error('❌ Failed to save call data:', error);
     throw new Error('Failed to save call data');
+  }
+}
+
+/**
+ * 保存对话分析（summary 和 goal analysis）
+ */
+export async function saveAnalysis(
+  conversationId: string,
+  callSummary?: CallSummary,
+  goalAnalysis?: GoalAnalysis
+): Promise<void> {
+  try {
+    console.log('💾 Saving analysis for conversation:', conversationId);
+
+    await axios.post(
+      `${MINERVA_BACKEND_URL}/intake/save-analysis`,
+      {
+        conversation_id: conversationId,
+        call_summary: callSummary,
+        goal_analysis: goalAnalysis,
+      },
+      {
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      }
+    );
+
+    console.log('✅ Analysis saved successfully');
+  } catch (error) {
+    console.error('❌ Failed to save analysis:', error);
+    // Don't throw - this is not critical
   }
 }
 

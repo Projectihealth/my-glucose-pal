@@ -40,12 +40,18 @@ from digital_avatar.api import avatar_bp, init_avatar_api
 # 使用 shared 数据库模块
 from shared.database import get_connection, TodoRepository, MemoryRepository
 
+# 导入 todos API
+from todos_api import todos_bp
+
 app = Flask(__name__)
 CORS(app)
 
 # 初始化并注册Avatar API
 init_avatar_api()
 app.register_blueprint(avatar_bp)
+
+# 注册 Todos API
+app.register_blueprint(todos_bp)
 
 # 数据库路径(可通过 CGM_DB_PATH 覆盖)
 DB_PATH = os.getenv(

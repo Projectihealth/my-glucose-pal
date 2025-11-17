@@ -1,6 +1,6 @@
 /**
  * useRetellCall Hook
- * 管理 Retell Web Call 的完整生命周期
+ * Manages the complete lifecycle of Retell Web Call
  */
 
 import { useState, useEffect, useCallback, useRef } from 'react';
@@ -20,7 +20,7 @@ interface UseRetellCallResult {
   callId: string | null;
 }
 
-// 声明全局 RetellWebClient 类型
+// Declare global RetellWebClient type
 declare global {
   interface Window {
     RetellWebClient: any;
@@ -28,13 +28,13 @@ declare global {
 }
 
 /**
- * 检测是否在开发模式（Mock 模式）
- * 设置为 false 以使用真实的 Retell API
+ * Detect if in development mode (Mock mode)
+ * Set to false to use real Retell API
  */
-const isDevelopmentMode = false; // 改为 false 强制使用生产模式
+const isDevelopmentMode = false; // Set to false to force production mode
 
 /**
- * Mock Retell Client（用于开发测试）
+ * Mock Retell Client (for development testing)
  */
 class MockRetellClient {
   private listeners: Map<string, Function[]> = new Map();
@@ -55,12 +55,12 @@ class MockRetellClient {
     console.log('🎭 Mock: Starting call with token:', config.accessToken.slice(0, 20) + '...');
     this.isCallActive = true;
     
-    // 模拟连接延迟
+    // Simulate connection delay
     await new Promise(resolve => setTimeout(resolve, 1000));
     
     this.emit('call_started');
     
-    // 模拟 Agent 开始说话
+    // Simulate Agent starting to speak
     setTimeout(() => {
       this.emit('agent_start_talking');
       setTimeout(() => {
@@ -94,28 +94,28 @@ class MockRetellClient {
 }
 
 /**
- * 加载 Retell Web Client SDK
- * 在开发模式下使用 Mock Client
+ * Load Retell Web Client SDK
+ * Use Mock Client in development mode
  */
 async function loadRetellSDK(): Promise<boolean> {
-  // 开发模式：使用 Mock Client
+  // Development mode: Use Mock Client
   if (isDevelopmentMode) {
     console.log('🎭 Development Mode: Using Mock Retell Client');
     window.RetellWebClient = MockRetellClient;
     return true;
   }
 
-  // 检查是否已经加载
+  // Check if already loaded
   if (window.RetellWebClient) {
     console.log('✅ Retell SDK already loaded');
     return true;
   }
 
-  // 生产模式：使用 ES Module 动态导入（正确的方式）
+  // Production mode: Use ES Module dynamic import (correct approach)
   try {
     console.log('⏳ Loading Retell SDK via ES Module from cdn.jsdelivr.net...');
     
-    // 使用正确的包名和 ES Module 格式（和你成功的 project 一样）
+    // Use correct package name and ES Module format (same as your successful project)
     const { RetellWebClient } = await import('https://cdn.jsdelivr.net/npm/retell-client-js-sdk@latest/+esm');
     
     if (RetellWebClient) {
@@ -127,7 +127,7 @@ async function loadRetellSDK(): Promise<boolean> {
     console.error('❌ Failed to load Retell SDK via ES Module:', error);
   }
 
-  // 如果 ES Module 加载失败，降级使用 Mock Client
+  // If ES Module loading fails, fallback to Mock Client
   console.warn('⚠️ Retell SDK failed to load, using Mock Client for development');
   window.RetellWebClient = MockRetellClient;
   return true;
@@ -146,9 +146,9 @@ export function useRetellCall(userId: string): UseRetellCallResult {
   const agentIdRef = useRef<string | null>(null);
   const callStartTimeRef = useRef<string | null>(null);
   const durationIntervalRef = useRef<NodeJS.Timeout | null>(null);
-  const transcriptRef = useRef<TranscriptMessage[]>([]); // 用 ref 保存最新的 transcript
+  const transcriptRef = useRef<TranscriptMessage[]>([]); // Use ref to save latest transcript
 
-  // 加载 Retell SDK
+  // Load Retell SDK
   useEffect(() => {
     let mounted = true;
 
@@ -159,7 +159,7 @@ export function useRetellCall(userId: string): UseRetellCallResult {
         if (!loaded) {
           setCallStatus({ 
             status: 'error', 
-            error: 'Retell SDK 加载失败。请检查网络连接。' 
+            error: 'Failed to load Retell SDK. Please check your network connection.' 
           });
         }
       }
@@ -172,7 +172,7 @@ export function useRetellCall(userId: string): UseRetellCallResult {
     };
   }, []);
 
-  // 初始化 Retell Web Client
+  // Initialize Retell Web Client
   useEffect(() => {
     if (!sdkLoaded || !window.RetellWebClient) {
       return;
@@ -182,13 +182,13 @@ export function useRetellCall(userId: string): UseRetellCallResult {
       const client = new window.RetellWebClient();
       retellClientRef.current = client;
 
-      // 监听通话更新事件
+      // Listen to call update events
       client.on('call_started', () => {
         console.log('📞 Call started');
-        // 记录通话开始时间
+        // Record call start time
         callStartTimeRef.current = new Date().toISOString();
         setCallStatus({ status: 'connected', callId: callIdRef.current || undefined });
-        // 开始计时
+        // Start timer
         setDuration(0);
         durationIntervalRef.current = setInterval(() => {
           setDuration(prev => prev + 1);
@@ -200,24 +200,24 @@ export function useRetellCall(userId: string): UseRetellCallResult {
         const endTime = new Date().toISOString();
         setCallStatus({ status: 'ended', callId: callIdRef.current || undefined });
 
-        // 停止计时
+        // Stop timer
         if (durationIntervalRef.current) {
           clearInterval(durationIntervalRef.current);
           durationIntervalRef.current = null;
         }
 
-        // 保存通话数据到数据库 (使用 ref 中的最新 transcript)
+        // Save call data to database (use latest transcript from ref)
         const currentTranscript = transcriptRef.current;
         if (callIdRef.current && agentIdRef.current && currentTranscript.length > 0 && callStartTimeRef.current) {
           try {
-            // 生成纯文本 transcript
+            // Generate plain text transcript
             const textTranscript = currentTranscript
-              .map(msg => `${msg.role === 'agent' ? 'Olivia' : '用户'}: ${msg.content}`)
+              .map(msg => `${msg.role === 'agent' ? 'Olivia' : 'User'}: ${msg.content}`)
               .join('\n');
 
             console.log(`💾 Saving call data with ${currentTranscript.length} transcript messages...`);
 
-            // 准备保存数据
+            // Prepare save data
             const saveParams: SaveCallDataParams = {
               userId: userId,
               callId: callIdRef.current,
@@ -226,10 +226,10 @@ export function useRetellCall(userId: string): UseRetellCallResult {
               callType: 'web_call',
               startTimestamp: callStartTimeRef.current,
               endTimestamp: endTime,
-              callDuration: duration, // 使用实际计时的秒数
+              callDuration: duration, // Use actual timer seconds
               transcript: textTranscript,
               transcriptObject: currentTranscript,
-              // 可选字段 - 如果 Retell 提供这些数据，可以在这里添加
+              // Optional fields - add here if Retell provides this data
               // callCost: callCostData,
               // disconnectionReason: 'user_hangup',
               // recordingUrl: recordingUrl,
@@ -262,14 +262,14 @@ export function useRetellCall(userId: string): UseRetellCallResult {
       });
 
       client.on('update', (update: any) => {
-        // 处理实时 transcript 更新
+        // Handle real-time transcript updates
         if (update.transcript) {
           const newTranscript: TranscriptMessage[] = update.transcript.map((item: any) => ({
             role: item.role === 'agent' ? 'agent' : 'user',
             content: item.content,
             timestamp: item.timestamp || Date.now(),
           }));
-          transcriptRef.current = newTranscript; // 同时更新 ref
+          transcriptRef.current = newTranscript; // Update ref at the same time
           setTranscript(newTranscript);
         }
       });
@@ -282,7 +282,7 @@ export function useRetellCall(userId: string): UseRetellCallResult {
       console.log('✅ Retell client initialized');
 
       return () => {
-        // 清理
+        // Cleanup
         if (retellClientRef.current) {
           try {
             retellClientRef.current.stopCall();
@@ -295,19 +295,19 @@ export function useRetellCall(userId: string): UseRetellCallResult {
       console.error('Failed to initialize Retell client:', error);
       setCallStatus({ 
         status: 'error', 
-        error: 'Retell Client 初始化失败' 
+        error: 'Failed to initialize Retell Client' 
       });
     }
   }, [sdkLoaded]);
 
   /**
-   * 开始通话
+   * Start call
    */
   const startCall = useCallback(async () => {
     if (!sdkLoaded || !window.RetellWebClient) {
       setCallStatus({ 
         status: 'error', 
-        error: 'Retell SDK 未加载。请刷新页面重试。' 
+        error: 'Retell SDK not loaded. Please refresh the page and try again.' 
       });
       return;
     }
@@ -315,12 +315,12 @@ export function useRetellCall(userId: string): UseRetellCallResult {
     try {
       setCallStatus({ status: 'connecting' });
       
-      // 开发模式：使用 Mock 数据，不调用后端
+      // Development mode: Use mock data, don't call backend
       if (isDevelopmentMode) {
         console.log('🎭 Mock: Using fake access token');
         callIdRef.current = 'mock_call_' + Date.now();
         
-        // 直接开始 Mock 通话
+        // Start mock call directly
         if (retellClientRef.current) {
           console.log('📞 Starting Mock Retell call...');
           await retellClientRef.current.startCall({
@@ -332,15 +332,15 @@ export function useRetellCall(userId: string): UseRetellCallResult {
         return;
       }
       
-      // 生产模式：从后端获取 access token
+      // Production mode: Get access token from backend
       console.log('🔑 Requesting access token...');
       const response = await createWebCall(userId);
       callIdRef.current = response.call_id;
-      agentIdRef.current = response.agent_id; // 保存 agent_id
+      agentIdRef.current = response.agent_id; // Save agent_id
 
       console.log('✅ Web call created:', response);
 
-      // 开始 Retell 通话
+      // Start Retell call
       if (retellClientRef.current) {
         console.log('📞 Starting Retell call...');
         await retellClientRef.current.startCall({
@@ -359,7 +359,7 @@ export function useRetellCall(userId: string): UseRetellCallResult {
   }, [userId, sdkLoaded]);
 
   /**
-   * 结束通话
+   * End call
    */
   const endCall = useCallback(() => {
     if (retellClientRef.current) {
@@ -374,7 +374,7 @@ export function useRetellCall(userId: string): UseRetellCallResult {
   }, []);
 
   /**
-   * 切换静音
+   * Toggle mute
    */
   const toggleMute = useCallback(() => {
     if (retellClientRef.current) {

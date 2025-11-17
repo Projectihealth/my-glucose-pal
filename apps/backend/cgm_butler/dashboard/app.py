@@ -8,6 +8,7 @@ CGM Butler Web Dashboard
 from flask import Flask, render_template, jsonify, request
 import sys
 import os
+import json
 from flask_cors import CORS
 
 # 添加项目根目录到路径 (用于 shared 模块)
@@ -35,6 +36,9 @@ print(f"   OPENAI_API_KEY: {'已设置' if os.getenv('OPENAI_API_KEY') else '未
 from database import CGMDatabase
 from pattern_identification import CGMPatternIdentifier
 from digital_avatar.api import avatar_bp, init_avatar_api
+
+# 使用 shared 数据库模块
+from shared.database import get_connection, TodoRepository, MemoryRepository
 
 app = Flask(__name__)
 CORS(app)
@@ -445,6 +449,297 @@ def tavus_get_health_recommendations():
             "user_id": user_id,
             "recommendations": actions
         })
+
+
+# ============================================================
+# Todos API Endpoints
+# ============================================================
+
+@app.route('/api/todos', methods=['GET'])
+def get_todos():
+    """Get todos for a user"""
+    user_id = request.args.get('user_id')
+    if not user_id:
+        return jsonify({'error': 'user_id is required'}), 400
+
+    status = request.args.get('status')
+    week_start = request.args.get('week_start')
+
+    try:
+        with get_connection() as conn:
+            todo_repo = TodoRepository(conn)
+            todos = todo_repo.get_by_user(user_id, status=status, week_start=week_start)
+            return jsonify({'todos': todos})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/todos/<int:todo_id>', methods=['GET'])
+def get_todo(todo_id):
+    """Get a specific todo by ID"""
+    try:
+        with get_connection() as conn:
+            todo_repo = TodoRepository(conn)
+            todo = todo_repo.get_by_id(todo_id)
+
+            if not todo:
+                return jsonify({'error': 'Todo not found'}), 404
+
+            return jsonify({'todo': todo})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/todos', methods=['POST'])
+def create_todo():
+    """Create a new todo"""
+    data = request.get_json()
+
+    if not data:
+        return jsonify({'error': 'Request body is required'}), 400
+
+    user_id = data.get('user_id')
+    title = data.get('title')
+
+    if not user_id or not title:
+        return jsonify({'error': 'user_id and title are required'}), 400
+
+    try:
+        with get_connection() as conn:
+            todo_repo = TodoRepository(conn)
+
+            optional_fields = {
+                'conversation_id': data.get('conversation_id'),
+                'description': data.get('description'),
+                'category': data.get('category'),
+                'health_benefit': data.get('health_benefit'),
+                'time_of_day': data.get('time_of_day'),
+                'time_description': data.get('time_description'),
+                'target_count': data.get('target_count', 1),
+                'current_count': data.get('current_count', 0),
+                'status': data.get('status', 'pending'),
+                'completed_today': data.get('completed_today', 0),
+                'uploaded_images': data.get('uploaded_images', []),
+                'notes': data.get('notes'),
+                'week_start': data.get('week_start'),
+            }
+
+            optional_fields = {k: v for k, v in optional_fields.items() if v is not None}
+
+            todo_id = todo_repo.create(user_id, title, **optional_fields)
+            todo = todo_repo.get_by_id(todo_id)
+
+            return jsonify({'todo': todo}), 201
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/todos/<int:todo_id>', methods=['PUT'])
+def update_todo(todo_id):
+    """Update a todo"""
+    data = request.get_json()
+
+    if not data:
+        return jsonify({'error': 'Request body is required'}), 400
+
+    try:
+        with get_connection() as conn:
+            todo_repo = TodoRepository(conn)
+
+            existing_todo = todo_repo.get_by_id(todo_id)
+            if not existing_todo:
+                return jsonify({'error': 'Todo not found'}), 404
+
+            success = todo_repo.update(todo_id, **data)
+
+            if not success:
+                return jsonify({'error': 'No fields to update'}), 400
+
+            todo = todo_repo.get_by_id(todo_id)
+            return jsonify({'todo': todo})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/todos/<int:todo_id>', methods=['DELETE'])
+def delete_todo(todo_id):
+    """Delete a todo"""
+    try:
+        with get_connection() as conn:
+            todo_repo = TodoRepository(conn)
+
+            existing_todo = todo_repo.get_by_id(todo_id)
+            if not existing_todo:
+                return jsonify({'error': 'Todo not found'}), 404
+
+            success = todo_repo.delete(todo_id)
+
+            if not success:
+                return jsonify({'error': 'Failed to delete todo'}), 500
+
+            return jsonify({'message': 'Todo deleted successfully'})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/todos/<int:todo_id>/check-in', methods=['POST'])
+def check_in_todo(todo_id):
+    """Check in / complete a todo (increment progress)"""
+    data = request.get_json() or {}
+
+    notes = data.get('notes')
+    images = data.get('images', [])
+
+    try:
+        with get_connection() as conn:
+            todo_repo = TodoRepository(conn)
+
+            existing_todo = todo_repo.get_by_id(todo_id)
+            if not existing_todo:
+                return jsonify({'error': 'Todo not found'}), 404
+
+            success = todo_repo.increment_progress(todo_id, notes=notes, images=images)
+
+            if not success:
+                return jsonify({'error': 'Failed to check in todo'}), 500
+
+            todo = todo_repo.get_by_id(todo_id)
+            return jsonify({'todo': todo})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/todos/reset-daily/<user_id>', methods=['POST'])
+def reset_daily_completion(user_id):
+    """Reset daily completion status for all todos of a user"""
+    try:
+        with get_connection() as conn:
+            todo_repo = TodoRepository(conn)
+            count = todo_repo.reset_daily_completion(user_id)
+
+            return jsonify({
+                'message': f'Reset {count} todos',
+                'count': count
+            })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+# ============================================================
+# Conversation History API Endpoints
+# ============================================================
+
+@app.route('/api/conversations/history/<user_id>', methods=['GET'])
+def get_conversation_history(user_id):
+    """
+    Get conversation history with summaries for a user
+    Combines data from conversations, user_memories, and conversation_analysis tables
+    """
+    try:
+        limit = request.args.get('limit', type=int, default=10)
+
+        with get_connection() as conn:
+            cursor = conn.cursor()
+
+            # Query to get conversations with their summaries from user_memories
+            query = '''
+            SELECT
+                c.conversation_id,
+                c.conversation_type,
+                c.started_at,
+                c.ended_at,
+                c.duration_seconds,
+                c.transcript,
+                m.summary,
+                m.key_topics,
+                m.insights,
+                m.extracted_data
+            FROM conversations c
+            LEFT JOIN user_memories m ON c.conversation_id = m.conversation_id
+            WHERE c.user_id = ?
+                AND c.status IN ('completed', 'ended')
+                AND m.summary IS NOT NULL
+            ORDER BY c.started_at DESC
+            LIMIT ?
+            '''
+
+            cursor.execute(query, (user_id, limit))
+            rows = cursor.fetchall()
+
+            conversations = []
+            for row in rows:
+                conversation = {
+                    'id': row[0],
+                    'type': row[1],
+                    'started_at': row[2],
+                    'ended_at': row[3],
+                    'duration_seconds': row[4],
+                    'transcript': row[5],
+                    'summary': row[6],
+                    'key_topics': json.loads(row[7]) if row[7] else [],
+                    'insights': row[8],
+                    'extracted_data': json.loads(row[9]) if row[9] else {}
+                }
+                conversations.append(conversation)
+
+            return jsonify({
+                'conversations': conversations,
+                'count': len(conversations)
+            })
+
+    except Exception as e:
+        print(f"Error fetching conversation history: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/conversations/<conversation_id>', methods=['GET'])
+def get_conversation_detail(conversation_id):
+    """
+    Get detailed information for a specific conversation
+    """
+    try:
+        with get_connection() as conn:
+            cursor = conn.cursor()
+
+            # Query conversation details
+            query = '''
+            SELECT
+                c.*,
+                m.summary,
+                m.key_topics,
+                m.insights,
+                m.extracted_data
+            FROM conversations c
+            LEFT JOIN user_memories m ON c.conversation_id = m.conversation_id
+            WHERE c.conversation_id = ?
+            '''
+
+            cursor.execute(query, (conversation_id,))
+            row = cursor.fetchone()
+
+            if not row:
+                return jsonify({'error': 'Conversation not found'}), 404
+
+            # Get column names
+            columns = [description[0] for description in cursor.description]
+            conversation = dict(zip(columns, row))
+
+            # Parse JSON fields
+            if conversation.get('key_topics'):
+                conversation['key_topics'] = json.loads(conversation['key_topics'])
+            if conversation.get('extracted_data'):
+                conversation['extracted_data'] = json.loads(conversation['extracted_data'])
+            if conversation.get('transcript'):
+                try:
+                    conversation['transcript'] = json.loads(conversation['transcript'])
+                except:
+                    pass  # Keep as string if not JSON
+
+            return jsonify({'conversation': conversation})
+
+    except Exception as e:
+        print(f"Error fetching conversation detail: {e}")
+        return jsonify({'error': str(e)}), 500
 
 
 if __name__ == '__main__':

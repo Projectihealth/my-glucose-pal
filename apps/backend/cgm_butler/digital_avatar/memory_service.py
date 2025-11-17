@@ -26,7 +26,9 @@ from shared.database import get_connection, MemoryRepository, OnboardingStatusRe
 from shared.database.repositories.onboarding_utils import calculate_onboarding_completion
 
 # 导入 Onboarding 信息提取函数
-from .onboarding_extractors import (
+# 注意：本文件既可能作为包内模块导入，也可能通过 spec_from_file_location 直接加载。
+# 直接加载时相对导入会失败，因此这里使用绝对导入。
+from apps.backend.cgm_butler.digital_avatar.onboarding_extractors import (
     _has_concerns_info,
     _has_goals_info,
     _has_eating_habits,

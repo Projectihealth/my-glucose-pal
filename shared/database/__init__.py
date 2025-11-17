@@ -18,7 +18,8 @@ from .repositories import (
     MemoryRepository,
     CGMRepository,
     UserRepository,
-    OnboardingStatusRepository
+    OnboardingStatusRepository,
+    TodoRepository
 )
 
 __all__ = [
@@ -29,5 +30,6 @@ __all__ = [
     'CGMRepository',
     'UserRepository',
     'OnboardingStatusRepository',
+    'TodoRepository',
 ]
 

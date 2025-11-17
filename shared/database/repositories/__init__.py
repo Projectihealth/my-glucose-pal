@@ -10,6 +10,7 @@ from .memory_repository import MemoryRepository
 from .cgm_repository import CGMRepository
 from .user_repository import UserRepository
 from .onboarding_status_repository import OnboardingStatusRepository
+from .todo_repository import TodoRepository
 
 __all__ = [
     'BaseRepository',
@@ -18,5 +19,6 @@ __all__ = [
     'CGMRepository',
     'UserRepository',
     'OnboardingStatusRepository',
+    'TodoRepository',
 ]
 

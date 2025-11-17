@@ -4,10 +4,20 @@ Intake Phone Agent Service
 """
 
 import os
+import sys
 import logging
 import requests
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List
 from datetime import datetime
+import json
+
+# 添加项目根目录到路径
+project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))))
+if project_root not in sys.path:
+    sys.path.insert(0, project_root)
+
+# 导入 shared database
+from shared.database import get_connection, MemoryRepository, TodoRepository, ConversationRepository, OnboardingStatusRepository
 
 # Retell SDK
 try:
@@ -87,10 +97,10 @@ async def get_cgm_butler_user_info(user_id: str) -> Dict[str, Any]:
 def calculate_age(date_of_birth: str) -> int:
     """
     计算年龄
-    
+
     Args:
         date_of_birth: 出生日期字符串 (格式: YYYY-MM-DD)
-    
+
     Returns:
         年龄（整数）
     """
@@ -104,22 +114,143 @@ def calculate_age(date_of_birth: str) -> int:
         return 0
 
 
+async def get_user_memory_context(user_id: str) -> Dict[str, Any]:
+    """
+    获取用户的 memory context（long-term memory + recent memories + active todos）
+
+    Args:
+        user_id: 用户 ID
+
+    Returns:
+        包含用户 memory 的字典
+    """
+    try:
+        with get_connection() as conn:
+            memory_repo = MemoryRepository(conn)
+            todo_repo = TodoRepository(conn)
+            conv_repo = ConversationRepository(conn)
+
+            # 1. 获取 long-term memory
+            long_term_memory = memory_repo.get_long_term_memory(user_id)
+
+            # 2. 获取最近的 memories (过去 7 天)
+            recent_memories = memory_repo.get_recent_memories(user_id, days=7, limit=5)
+
+            # 3. 获取活跃的 todos (pending 或 in_progress)
+            all_todos = todo_repo.get_by_user(user_id)
+            active_todos = [
+                todo for todo in all_todos
+                if todo['status'] in ['pending', 'in_progress']
+            ]
+
+            # 4. 获取最近的对话记录（用于 context）
+            recent_conversations = conv_repo.get_user_conversations(user_id, limit=3)
+
+            logger.info(f"==== Fetched memory context for {user_id}:")
+            logger.info(f"     - Long-term memory: {bool(long_term_memory)}")
+            logger.info(f"     - Recent memories: {len(recent_memories)}")
+            logger.info(f"     - Active todos: {len(active_todos)}")
+            logger.info(f"     - Recent conversations: {len(recent_conversations)}")
+
+            return {
+                "long_term_memory": long_term_memory,
+                "recent_memories": recent_memories,
+                "active_todos": active_todos,
+                "recent_conversations": recent_conversations
+            }
+
+    except Exception as e:
+        logger.error(f"==== Failed to fetch user memory context: {e}", exc_info=True)
+        return {
+            "long_term_memory": None,
+            "recent_memories": [],
+            "active_todos": [],
+            "recent_conversations": []
+        }
+
+
+def format_memory_for_prompt(memory_context: Dict[str, Any]) -> str:
+    """
+    将 memory context 格式化为适合放入 prompt 的文本
+
+    Args:
+        memory_context: 从 get_user_memory_context 返回的 context
+
+    Returns:
+        格式化的文本字符串
+    """
+    parts = []
+
+    # Long-term memory
+    ltm = memory_context.get("long_term_memory")
+    if ltm:
+        parts.append("=== USER PROFILE ===")
+
+        if ltm.get("health_goals"):
+            try:
+                goals = json.loads(ltm["health_goals"]) if isinstance(ltm["health_goals"], str) else ltm["health_goals"]
+                if goals:
+                    parts.append(f"Health Goals: {goals}")
+            except:
+                pass
+
+        if ltm.get("preferences"):
+            try:
+                prefs = json.loads(ltm["preferences"]) if isinstance(ltm["preferences"], str) else ltm["preferences"]
+                if prefs:
+                    parts.append(f"Preferences: {prefs}")
+            except:
+                pass
+
+        if ltm.get("habits"):
+            try:
+                habits = json.loads(ltm["habits"]) if isinstance(ltm["habits"], str) else ltm["habits"]
+                if habits:
+                    parts.append(f"Habits: {habits}")
+            except:
+                pass
+
+    # Recent memories
+    recent = memory_context.get("recent_memories", [])
+    if recent:
+        parts.append("\n=== RECENT CONVERSATIONS ===")
+        for i, mem in enumerate(recent[:3], 1):
+            if mem.get("summary"):
+                parts.append(f"{i}. {mem['summary']}")
+            if mem.get("insights"):
+                parts.append(f"   Insights: {mem['insights']}")
+
+    # Active todos
+    todos = memory_context.get("active_todos", [])
+    if todos:
+        parts.append("\n=== ACTIVE HEALTH GOALS ===")
+        for todo in todos[:5]:
+            status_emoji = "⏳" if todo['status'] == 'pending' else "🔄"
+            progress = f"{todo['current_count']}/{todo['target_count']}"
+            parts.append(f"{status_emoji} {todo['title']} ({progress} days)")
+            if todo.get('health_benefit'):
+                parts.append(f"   Benefit: {todo['health_benefit']}")
+
+    return "\n".join(parts) if parts else "No previous context available."
+
+
 async def create_intake_web_call(
     user_id: str,
     previous_transcript: Optional[list] = None
 ) -> Dict[str, Any]:
     """
     创建 CGM Butler App 的 Web Call（简化版）
-    
+
     流程：
     1. 从 CGM Butler 数据库获取用户信息
-    2. 构建 Retell 动态变量
-    3. 创建 Web Call
-    
+    2. 获取用户的 memory context (long-term memory, recent conversations, todos)
+    3. 构建 Retell 动态变量
+    4. 创建 Web Call
+
     Args:
         user_id: CGM Butler 用户 ID（必需）
         previous_transcript: 历史对话记录（可选，用于恢复中断的通话）
-    
+
     Returns:
         {
             "status_code": 200,
@@ -135,21 +266,47 @@ async def create_intake_web_call(
         # 步骤 1: 获取用户信息（从 CGM Butler 数据库）
         logger.info(f"==== Fetching user info for user_id: {user_id}")
         user_info = await get_cgm_butler_user_info(user_id)
-        
+
+        user_name = user_info.get('name', 'there')
+        logger.info(f"==== User name: {user_name}")
+
         # 步骤 2: 计算年龄
         dob = user_info.get('date_of_birth', '1990-01-01')
         age = calculate_age(dob)
-        
-        # 步骤 3: 构建 Retell 动态变量（简洁）
+
+        # 步骤 3: 获取 onboarding status
+        logger.info(f"==== Fetching onboarding status for user_id: {user_id}")
+        with get_connection() as conn:
+            onboarding_repo = OnboardingStatusRepository(conn)
+            onboarding_status = onboarding_repo.get_or_create(user_id)
+
+        onboarding_stage = onboarding_status.get('onboarding_stage', 'not_started')
+        completion_score = onboarding_status.get('completion_score', 0)
+        engagement_stage = onboarding_status.get('engagement_stage', 'new_user')
+
+        logger.info(f"==== Onboarding: stage={onboarding_stage}, score={completion_score}, engagement={engagement_stage}")
+
+        # 步骤 4: 获取用户的 memory context
+        logger.info(f"==== Fetching memory context for user_id: {user_id}")
+        memory_context = await get_user_memory_context(user_id)
+        memory_text = format_memory_for_prompt(memory_context)
+
+        # 步骤 5: 构建 Retell 动态变量（包含 memory context + onboarding info）
         llm_dynamic_variables = {
-            "user_name": user_info.get('name', 'there'),
+            "user_name": user_name,
             "user_age": str(age),
             "user_health_goal": user_info.get('health_goal', 'managing your health'),
             "user_conditions": user_info.get('conditions', 'your health'),
             "user_cgm_device": user_info.get('cgm_device_type', 'CGM device'),
+            "user_memory_context": memory_text,  # ⭐ Memory context
+            "onboarding_stage": onboarding_stage,  # ⭐ Onboarding stage
+            "completion_score": str(completion_score),  # ⭐ Completion score
+            "is_new_user": "true" if onboarding_stage in ['not_started', 'in_progress'] and completion_score < 80 else "false",
         }
-        
-        # 步骤 4: 添加历史对话（如果是恢复通话）
+
+        logger.info(f"==== Dynamic variables: user_name={user_name}, onboarding_stage={onboarding_stage}, is_new_user={llm_dynamic_variables['is_new_user']}")
+
+        # 步骤 5: 添加历史对话（如果是恢复通话）
         if previous_transcript:
             llm_dynamic_variables["previous_transcript"] = previous_transcript
             logger.info(f"==== Restoring call with {len(previous_transcript)} previous messages")

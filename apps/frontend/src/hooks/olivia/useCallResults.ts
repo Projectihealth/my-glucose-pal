@@ -1,6 +1,6 @@
 /**
  * useCallResults Hook
- * 管理通话结束后的结果获取（Summary 和 Goal Analysis）
+ * Manage results retrieval after call ends (Summary and Goal Analysis)
  */
 
 import { useState, useEffect, useCallback } from 'react';
@@ -16,9 +16,9 @@ interface UseCallResultsOptions {
 }
 
 /**
- * 检测是否在开发模式（Mock 模式）
+ * Detect if in development mode (Mock mode)
  */
-const isDevelopmentMode = false; // 改为 false 强制使用生产模式
+const isDevelopmentMode = false; // Set to false to force production mode
 
 /**
  * Mock Data Generator
@@ -112,7 +112,7 @@ export function useCallResults({
   const [error, setError] = useState<string | undefined>();
 
   /**
-   * 生成 Mock 结果（开发模式）
+   * Generate mock results (development mode)
    */
   const generateMockResults = useCallback(async () => {
     if (!callId || !isCallEnded || transcript.length === 0) {
@@ -124,7 +124,7 @@ export function useCallResults({
     setError(undefined);
 
     try {
-      // 模拟 API 延迟
+      // Simulate API delay
       await new Promise(resolve => setTimeout(resolve, 1500));
 
       const mockSummary = generateMockSummary(transcript);
@@ -145,7 +145,7 @@ export function useCallResults({
   }, [callId, transcript, userName, isCallEnded]);
 
   /**
-   * 生成真实结果（生产模式）
+   * Generate real results (production mode)
    */
   const generateResults = useCallback(async () => {
     if (!callId || !isCallEnded || transcript.length === 0) {
@@ -157,16 +157,16 @@ export function useCallResults({
     setError(undefined);
 
     try {
-      // 并行发起生成请求
+      // Issue generation requests in parallel
       const [summaryResult, goalResult] = await Promise.allSettled([
         generateCallSummary(callId, transcript),
         analyzeGoalAchievement(callId, transcript, userId, userName),
       ]);
 
-      // 处理 Summary 结果
+      // Handle Summary result
       if (summaryResult.status === 'fulfilled') {
         console.log('✅ Summary generated:', summaryResult.value);
-        // 确保返回的数据结构完整
+        // Ensure returned data structure is complete
         const summary = summaryResult.value || {};
         setSummary({
           data_quality: summary.data_quality || 'insufficient',
@@ -182,7 +182,7 @@ export function useCallResults({
         console.error('❌ Failed to generate summary:', summaryResult.reason);
       }
 
-      // 处理 Goal Analysis 结果
+      // Handle Goal Analysis result
       if (goalResult.status === 'fulfilled') {
         console.log('✅ Goal analysis generated:', goalResult.value);
         setGoalAnalysis(goalResult.value);
@@ -190,7 +190,7 @@ export function useCallResults({
         console.error('❌ Failed to generate goal analysis:', goalResult.reason);
       }
 
-      // 如果都失败了，设置错误
+      // If both failed, set error
       if (summaryResult.status === 'rejected' && goalResult.status === 'rejected') {
         setError('Failed to generate results. The conversation may have been too short.');
       }
@@ -203,7 +203,7 @@ export function useCallResults({
   }, [callId, transcript, userId, userName, isCallEnded]);
 
   /**
-   * 轮询结果（备用方案，仅生产模式）
+   * Poll for results (fallback, production mode only)
    */
   const pollResults = useCallback(async () => {
     if (!callId || !isCallEnded || isDevelopmentMode) {
@@ -236,15 +236,15 @@ export function useCallResults({
   }, [callId, isCallEnded]);
 
   /**
-   * 当通话结束时，自动生成结果
+   * Automatically generate results when call ends
    */
   useEffect(() => {
     if (isCallEnded && callId && transcript.length > 0 && !summary && !goalAnalysis && !isLoading) {
-      // 开发模式：使用 Mock 数据
+      // Development mode: Use mock data
       if (isDevelopmentMode) {
         generateMockResults();
       } else {
-        // 生产模式：调用真实 API
+        // Production mode: Call real API
         generateResults();
       }
     }

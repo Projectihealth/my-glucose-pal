@@ -212,24 +212,34 @@ CREATE TABLE IF NOT EXISTS user_todos (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     user_id VARCHAR(50) NOT NULL,
     conversation_id VARCHAR(100),
-    
+
     -- TODO 内容
     title VARCHAR(200) NOT NULL,
     description TEXT,
     category VARCHAR(50),      -- 'diet', 'exercise', 'sleep', 'stress', 'medication', 'other'
-    
+    health_benefit TEXT,       -- 健康益处说明
+
+    -- 时间相关
+    time_of_day VARCHAR(50),   -- 时间段 (e.g., '09:00-10:00')
+    time_description VARCHAR(100), -- 时间描述 (e.g., 'Before work')
+
     -- 进度跟踪
     target_count INTEGER DEFAULT 1,     -- 目标次数
     current_count INTEGER DEFAULT 0,    -- 当前完成次数
     status VARCHAR(20) DEFAULT 'pending', -- 'pending', 'in_progress', 'completed', 'cancelled'
-    
+    completed_today INTEGER DEFAULT 0,   -- 今天是否已完成 (0 or 1)
+
+    -- 附件
+    uploaded_images TEXT,      -- 上传的图片 URLs (JSON array)
+    notes TEXT,                -- 用户笔记
+
     -- 时间范围
     week_start DATE,           -- 本周开始日期 (YYYY-MM-DD)
-    
+
     -- 元数据
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     completed_at TIMESTAMP,
-    
+
     FOREIGN KEY (user_id) REFERENCES users(user_id),
     FOREIGN KEY (conversation_id) REFERENCES conversations(conversation_id)
 )

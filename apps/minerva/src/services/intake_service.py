@@ -33,7 +33,11 @@ except ImportError as e:
     logging.warning(f"VoiceChatContextService not available: {e}")
     CONTEXT_SERVICE_AVAILABLE = False
 
+# Import shared database repositories
+from shared.database import get_connection, MemoryRepository, TodoRepository, ConversationRepository, OnboardingStatusRepository
+
 logger = logging.getLogger(__name__)
+logging.basicConfig(level=logging.INFO)
 
 # 从环境变量获取配置
 RETELL_API_KEY = os.getenv("RETELL_API_KEY")
@@ -103,6 +107,98 @@ def calculate_age(date_of_birth: str) -> int:
         return 0
 
 
+async def get_user_memory_context(user_id: str) -> Dict[str, Any]:
+    """
+    获取用户的记忆上下文，包括：
+    - 长期记忆（健康目标、偏好、习惯）
+    - 近期记忆（过去7天）
+    - 活跃的待办事项
+    - 最近的对话
+    """
+    try:
+        with get_connection() as conn:
+            memory_repo = MemoryRepository(conn)
+            todo_repo = TodoRepository(conn)
+            conv_repo = ConversationRepository(conn)
+
+            # 获取长期记忆
+            long_term_memory = memory_repo.get_long_term_memory(user_id)
+
+            # 获取近期记忆（过去7天）
+            recent_memories = memory_repo.get_recent_memories(user_id, days=7, limit=5)
+
+            # 获取活跃的待办事项
+            all_todos = todo_repo.get_by_user(user_id)
+            active_todos = [todo for todo in all_todos if todo['status'] in ['pending', 'in_progress']]
+
+            # 获取最近的对话
+            recent_conversations = conv_repo.get_user_conversations(user_id, limit=3)
+
+            return {
+                'long_term_memory': long_term_memory,
+                'recent_memories': recent_memories,
+                'active_todos': active_todos,
+                'recent_conversations': recent_conversations
+            }
+    except Exception as e:
+        logger.warning(f"Failed to get memory context for {user_id}: {e}")
+        return {
+            'long_term_memory': {},
+            'recent_memories': [],
+            'active_todos': [],
+            'recent_conversations': []
+        }
+
+
+def format_memory_for_prompt(memory_context: Dict[str, Any]) -> str:
+    """将记忆上下文格式化为可读文本，用于prompt注入"""
+    sections = []
+
+    # 长期记忆
+    long_term = memory_context.get('long_term_memory', {})
+    if long_term:
+        sections.append("**USER PROFILE:**")
+        if long_term.get('health_goals'):
+            sections.append(f"- Health Goals: {long_term['health_goals']}")
+        if long_term.get('dietary_preferences'):
+            sections.append(f"- Dietary Preferences: {long_term['dietary_preferences']}")
+        if long_term.get('exercise_habits'):
+            sections.append(f"- Exercise Habits: {long_term['exercise_habits']}")
+        if long_term.get('concerns'):
+            sections.append(f"- Health Concerns: {', '.join(long_term['concerns'])}")
+
+    # 近期对话（从recent_conversations提取）
+    recent_convs = memory_context.get('recent_conversations', [])
+    if recent_convs:
+        sections.append("\n**RECENT CONVERSATIONS:**")
+        for conv in recent_convs[:3]:  # 最多3条
+            # 从transcript提取关键信息
+            transcript = conv.get('transcript', '')
+            if transcript and len(transcript) > 50:
+                # 提取前200个字符作为摘要
+                summary = transcript[:200].replace('\n', ' ').strip()
+                if len(transcript) > 200:
+                    summary += "..."
+                sections.append(f"- {summary}")
+
+    # 从memory表提取的insights
+    recent_memories = memory_context.get('recent_memories', [])
+    if recent_memories:
+        sections.append("\n**KEY INSIGHTS FROM PAST CONVERSATIONS:**")
+        for mem in recent_memories[:2]:  # 最多2条
+            if mem.get('summary'):
+                sections.append(f"- {mem['summary'][:150]}")
+
+    # 活跃待办事项
+    todos = memory_context.get('active_todos', [])
+    if todos:
+        sections.append("\n**ACTIVE HEALTH GOALS:**")
+        for todo in todos[:5]:  # 最多5条
+            sections.append(f"- {todo['title']} (Progress: {todo['current_count']}/{todo['target_count']})")
+
+    return "\n".join(sections) if sections else "No previous context available."
+
+
 async def create_intake_web_call(
     user_id: str,
     previous_transcript: Optional[list] = None
@@ -111,11 +207,29 @@ async def create_intake_web_call(
     try:
         logger.info(f"==== Fetching user info for user_id: {user_id}")
         user_info = await get_cgm_butler_user_info(user_id)
-        
+
         dob = user_info.get('date_of_birth', '1990-01-01')
         age = calculate_age(dob)
         user_name = user_info.get('name', 'there')
-        
+
+        logger.info(f"==== User name: {user_name}, age: {age}")
+
+        # 获取 onboarding status
+        with get_connection() as conn:
+            onboarding_repo = OnboardingStatusRepository(conn)
+            onboarding_status = onboarding_repo.get_or_create(user_id)
+
+        onboarding_stage = onboarding_status.get('onboarding_stage', 'not_started')
+        completion_score = onboarding_status.get('completion_score', 0)
+
+        logger.info(f"==== Onboarding stage: {onboarding_stage}, completion: {completion_score}%")
+
+        # 获取用户记忆上下文
+        memory_context = await get_user_memory_context(user_id)
+        memory_text = format_memory_for_prompt(memory_context)
+
+        logger.info(f"==== Memory context loaded: {len(memory_text)} chars")
+
         # 基础动态变量
         llm_dynamic_variables = {
             "user_name": user_name,
@@ -123,26 +237,14 @@ async def create_intake_web_call(
             "user_health_goal": user_info.get('health_goal', 'managing your health'),
             "user_conditions": user_info.get('conditions', 'your health'),
             "user_cgm_device": user_info.get('cgm_device_type', 'CGM device'),
+            "user_memory_context": memory_text,
+            "onboarding_stage": onboarding_stage,
+            "completion_score": str(completion_score),
+            "is_new_user": "true" if onboarding_stage in ['not_started', 'in_progress'] and completion_score < 80 else "false",
         }
-        
-        # 获取动态 Call Context (Onboarding / Continuation / Follow-up)
-        if CONTEXT_SERVICE_AVAILABLE:
-            try:
-                context_service = get_context_service()
-                context_info = context_service.get_call_context(user_id, user_name)
-                
-                # 添加 call_context 到动态变量
-                llm_dynamic_variables["call_context"] = context_info['call_context']
-                
-                logger.info(f"📞 Call Type: {context_info['call_type']} (Score: {context_info['completion_score']}%)")
-            except Exception as ctx_error:
-                logger.warning(f"⚠️  Failed to get call context: {ctx_error}. Using default.")
-                # 使用默认的 onboarding context
-                llm_dynamic_variables["call_context"] = "This is the user's first call. Focus on understanding their concerns and goals."
-        else:
-            logger.warning("⚠️  VoiceChatContextService not available. Using default context.")
-            llm_dynamic_variables["call_context"] = "This is the user's first call. Focus on understanding their concerns and goals."
-        
+
+        logger.info(f"==== Dynamic variables set: is_new_user={llm_dynamic_variables['is_new_user']}, onboarding_stage={onboarding_stage}")
+
         if previous_transcript:
             llm_dynamic_variables["previous_transcript"] = previous_transcript
             logger.info(f"==== Restoring call with {len(previous_transcript)} previous messages")

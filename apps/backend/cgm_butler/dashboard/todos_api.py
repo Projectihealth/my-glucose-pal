@@ -18,6 +18,7 @@ if project_root not in sys.path:
 
 # 使用新的 shared/database
 from shared.database import get_connection, TodoRepository
+from shared.database.repositories.todo_checkin_repository import TodoCheckinRepository
 
 # Create Blueprint
 todos_bp = Blueprint('todos', __name__, url_prefix='/api/todos')
@@ -124,7 +125,8 @@ def create_todo():
                 'target_count': data.get('target_count', 1),
                 'current_count': data.get('current_count', 0),
                 'status': data.get('status', 'pending'),
-                'completed_today': data.get('completed_today', 0),
+                'completed_today': data.get('completed_today', False),
+                'user_selected': data.get('user_selected', True),
                 'uploaded_images': data.get('uploaded_images', []),
                 'notes': data.get('notes'),
                 'week_start': data.get('week_start'),
@@ -245,11 +247,22 @@ def check_in_todo(todo_id: int):
             if not existing_todo:
                 return jsonify({'error': 'Todo not found'}), 404
 
-            # Increment progress
+            # Increment progress on main todo record
             success = todo_repo.increment_progress(todo_id, notes=notes, images=images)
 
             if not success:
                 return jsonify({'error': 'Failed to check in todo'}), 500
+
+            # 记录每日 check-in，用于周统计
+            try:
+                checkin_repo = TodoCheckinRepository(conn)
+                checkin_repo.create(
+                    user_id=existing_todo['user_id'],
+                    todo_id=todo_id,
+                )
+            except Exception as e:
+                # 不让统计失败影响主流程，只打印日志
+                print(f"⚠️ Failed to create todo_checkin record: {e}")
 
             # Get the updated todo
             todo = todo_repo.get_by_id(todo_id)
@@ -280,6 +293,45 @@ def reset_daily_completion(user_id: str):
                 'message': f'Reset {count} todos',
                 'count': count
             })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@todos_bp.route('/weekly-stats/<user_id>', methods=['GET'])
+def get_weekly_stats(user_id: str):
+    """
+    Get weekly completion stats for a user.
+
+    Query Parameters:
+        week_start (str, optional): Week start date (YYYY-MM-DD). Defaults to current week Monday.
+
+    Returns:
+        JSON: {
+          "user_id": "...",
+          "week_start": "YYYY-MM-DD",
+          "days": [
+            {"date": "YYYY-MM-DD", "day_label": "Mon", "completed": 2, "total": 5, "rate": 40},
+            ...
+          ],
+          "week_average": 47
+        }
+    """
+    from datetime import datetime, timedelta
+
+    week_start = request.args.get('week_start')
+
+    # 如果没有传 week_start，默认当前周的周一
+    if not week_start:
+        today = datetime.now().date()
+        # Monday is 0, Sunday is 6
+        monday = today - timedelta(days=today.weekday())
+        week_start = monday.isoformat()
+
+    try:
+        with get_connection() as conn:
+            checkin_repo = TodoCheckinRepository(conn)
+            stats = checkin_repo.get_weekly_completion(user_id, week_start)
+            return jsonify(stats)
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
@@ -320,6 +372,12 @@ def batch_create_todos():
     todos_data = data.get('todos', [])
     conversation_id = data.get('conversation_id')
     week_start = data.get('week_start')
+    
+    print(f"[batch_create_todos] Received request:")
+    print(f"  user_id: {user_id}")
+    print(f"  conversation_id: {conversation_id}")
+    print(f"  week_start: {week_start}")
+    print(f"  todos_count: {len(todos_data)}")
 
     if not user_id:
         return jsonify({'error': 'user_id is required'}), 400
@@ -348,7 +406,7 @@ def batch_create_todos():
                     'target_count': todo_data.get('target_count', 1),
                     'current_count': todo_data.get('current_count', 0),
                     'status': todo_data.get('status', 'pending'),
-                    'user_selected': 1 if todo_data.get('user_selected', True) else 0,  # Convert to int for database
+                    'user_selected': todo_data.get('user_selected', True),  # Boolean value - will be normalized by repository
                     'priority': todo_data.get('priority'),
                     'recommendation_tag': todo_data.get('recommendation_tag'),
                     'week_start': week_start,
@@ -358,11 +416,14 @@ def batch_create_todos():
                 optional_fields = {k: v for k, v in optional_fields.items() if v is not None}
 
                 # Create todo
-                todo_id = todo_repo.create(user_id, title, **optional_fields)
-
-                # Get created todo
-                todo = todo_repo.get_by_id(todo_id)
-                created_todos.append(todo)
+                try:
+                    todo_id = todo_repo.create(user_id, title, **optional_fields)
+                    # Get created todo
+                    todo = todo_repo.get_by_id(todo_id)
+                    created_todos.append(todo)
+                except Exception as create_error:
+                    print(f"[batch_create_todos] Failed to create todo '{title}': {create_error}")
+                    raise
 
             conn.commit()
 
@@ -373,4 +434,7 @@ def batch_create_todos():
             }), 201
 
     except Exception as e:
+        import traceback
+        print(f"[batch_create_todos] Error: {e}")
+        print(traceback.format_exc())
         return jsonify({'error': str(e)}), 500

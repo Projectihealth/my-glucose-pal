@@ -104,8 +104,8 @@ class TodoRepository(BaseRepository):
             kwargs.get('target_count', 1),
             kwargs.get('current_count', 0),
             kwargs.get('status', 'pending'),
-            kwargs.get('completed_today', 0),
-            kwargs.get('user_selected', 1),  # Default to True/1
+            self._normalize_bool_for_db(kwargs.get('completed_today', False)),
+            self._normalize_bool_for_db(kwargs.get('user_selected', True)),
             kwargs.get('priority'),
             kwargs.get('recommendation_tag'),
             uploaded_images,
@@ -133,18 +133,15 @@ class TodoRepository(BaseRepository):
 
         # Handle uploaded_images serialization
         if 'uploaded_images' in kwargs:
-            if isinstance(kwargs['uploaded_images'], list):
-                # Only serialize for SQLite; MySQL JSON type handles lists automatically
-                if self.db_type == 'sqlite':
-                    kwargs['uploaded_images'] = json.dumps(kwargs['uploaded_images'])
-                # For MySQL, keep as list
-
-        # Normalise uploaded_images for UPDATE as well
-        if 'uploaded_images' in kwargs:
             ui = kwargs['uploaded_images']
             if isinstance(ui, list):
                 # Always store as JSON string; works for both SQLite (TEXT) and MySQL (JSON)
                 kwargs['uploaded_images'] = json.dumps(ui)
+
+        # Normalize boolean fields
+        for bool_field in ['completed_today', 'user_selected']:
+            if bool_field in kwargs and isinstance(kwargs[bool_field], bool):
+                kwargs[bool_field] = self._normalize_bool_for_db(kwargs[bool_field])
 
         for field in [
             'title', 'description', 'category', 'health_benefit',
@@ -239,7 +236,7 @@ class TodoRepository(BaseRepository):
             # Prevent current_count from exceeding target_count
             'current_count': min(new_count, target_count),
             'status': status,
-            'completed_today': 1,
+            'completed_today': True,
         }
 
         if notes:
@@ -261,9 +258,12 @@ class TodoRepository(BaseRepository):
         Returns:
             Number of todos reset
         """
+        false_val = self._normalize_bool_for_db(False)
+        true_val = self._normalize_bool_for_db(True)
+
         self.execute(
-            'UPDATE user_todos SET completed_today = 0 WHERE user_id = ? AND completed_today = 1',
-            (user_id,)
+            f'UPDATE user_todos SET completed_today = ? WHERE user_id = ? AND completed_today = ?',
+            (false_val, user_id, true_val)
         )
         self.commit()
         return self.cursor.rowcount
@@ -291,8 +291,10 @@ class TodoRepository(BaseRepository):
         else:
             todo['uploaded_images'] = []
 
-        # Convert completed_today to boolean
+        # Convert boolean fields
         if 'completed_today' in todo:
-            todo['completed_today'] = bool(todo['completed_today'])
+            todo['completed_today'] = self._normalize_bool_from_db(todo['completed_today'])
+        if 'user_selected' in todo:
+            todo['user_selected'] = self._normalize_bool_from_db(todo['user_selected'])
 
         return todo

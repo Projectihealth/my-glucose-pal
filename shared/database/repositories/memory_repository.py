@@ -33,8 +33,8 @@ class MemoryRepository(BaseRepository):
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
         ''', (
             user_id, conversation_id, channel, summary, insights,
-            json.dumps(key_topics or [], ensure_ascii=False),
-            json.dumps(extracted_data or {}, ensure_ascii=False),
+            self._serialize_json_for_db(key_topics or []),
+            self._serialize_json_for_db(extracted_data or {}),
             created_at or datetime.now().isoformat()
         ))
         
@@ -52,9 +52,9 @@ class MemoryRepository(BaseRepository):
         if self.db_type == 'mysql':
             query = '''
             SELECT * FROM user_memories 
-            WHERE user_id = ? AND created_at >= DATE_SUB(NOW(), INTERVAL ? DAY)
+            WHERE user_id = %s AND created_at >= DATE_SUB(NOW(), INTERVAL %s DAY)
             ORDER BY created_at DESC
-            LIMIT ?
+            LIMIT %s
             '''
         else:  # sqlite
             query = '''
@@ -65,13 +65,11 @@ class MemoryRepository(BaseRepository):
             '''
         
         rows = self.fetchall(query, (user_id, days, limit))
-        
+
         for row in rows:
-            if row.get('key_topics'):
-                row['key_topics'] = json.loads(row['key_topics']) if isinstance(row['key_topics'], str) else row['key_topics']
-            if row.get('extracted_data'):
-                row['extracted_data'] = json.loads(row['extracted_data']) if isinstance(row['extracted_data'], str) else row['extracted_data']
-        
+            row['key_topics'] = self._deserialize_json_from_db(row.get('key_topics'))
+            row['extracted_data'] = self._deserialize_json_from_db(row.get('extracted_data'))
+
         return rows
     
     def update_long_term_memory(
@@ -97,7 +95,7 @@ class MemoryRepository(BaseRepository):
                          'exercise_patterns', 'stress_patterns', 'sleep_patterns', 'concerns']:
                 if field in fields and fields[field] is not None:
                     updates.append(f'{field} = ?')
-                    params.append(json.dumps(fields[field], ensure_ascii=False))
+                    params.append(self._serialize_json_for_db(fields[field]))
             
             if updates:
                 updates.append('updated_at = ?')
@@ -116,14 +114,14 @@ class MemoryRepository(BaseRepository):
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ''', (
                 user_id,
-                json.dumps(fields.get('preferences', {}), ensure_ascii=False),
-                json.dumps(fields.get('health_goals', {}), ensure_ascii=False),
-                json.dumps(fields.get('habits', {}), ensure_ascii=False),
-                json.dumps(fields.get('dietary_patterns', {}), ensure_ascii=False),
-                json.dumps(fields.get('exercise_patterns', {}), ensure_ascii=False),
-                json.dumps(fields.get('stress_patterns', {}), ensure_ascii=False),
-                json.dumps(fields.get('sleep_patterns', {}), ensure_ascii=False),
-                json.dumps(fields.get('concerns', []), ensure_ascii=False),
+                self._serialize_json_for_db(fields.get('preferences', {})),
+                self._serialize_json_for_db(fields.get('health_goals', {})),
+                self._serialize_json_for_db(fields.get('habits', {})),
+                self._serialize_json_for_db(fields.get('dietary_patterns', {})),
+                self._serialize_json_for_db(fields.get('exercise_patterns', {})),
+                self._serialize_json_for_db(fields.get('stress_patterns', {})),
+                self._serialize_json_for_db(fields.get('sleep_patterns', {})),
+                self._serialize_json_for_db(fields.get('concerns', [])),
                 updated_at,
                 updated_at
             ))
@@ -140,9 +138,8 @@ class MemoryRepository(BaseRepository):
         if row:
             for field in ['preferences', 'health_goals', 'habits', 'dietary_patterns',
                          'exercise_patterns', 'stress_patterns', 'sleep_patterns', 'concerns']:
-                if row.get(field):
-                    row[field] = json.loads(row[field])
-        
+                row[field] = self._deserialize_json_from_db(row.get(field))
+
         return row
     
     def save_todos(

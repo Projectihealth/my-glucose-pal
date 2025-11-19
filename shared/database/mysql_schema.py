@@ -253,31 +253,50 @@ CREATE TABLE IF NOT EXISTS user_todos (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
 """
 
+TODO_CHECKINS_TABLE = """
+CREATE TABLE IF NOT EXISTS todo_checkins (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    user_id VARCHAR(50) NOT NULL,
+    todo_id INT NOT NULL,
+    checkin_date DATE NOT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+
+    FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE,
+    FOREIGN KEY (todo_id) REFERENCES user_todos(id) ON DELETE CASCADE,
+    INDEX idx_checkin_user_date (user_id, checkin_date),
+    INDEX idx_checkin_todo_date (todo_id, checkin_date)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+"""
+
 # 用户Onboarding状态表
 USER_ONBOARDING_STATUS_TABLE = """
 CREATE TABLE IF NOT EXISTS user_onboarding_status (
     id INT AUTO_INCREMENT PRIMARY KEY,
     user_id VARCHAR(50) UNIQUE NOT NULL,
-    
+
     -- Onboarding进度
     completion_score INT DEFAULT 0,
-    onboarding_stage VARCHAR(50) DEFAULT 'initial',
-    
+    onboarding_stage VARCHAR(50) DEFAULT 'not_started',
+
     -- 收集的信息
     has_health_goals BOOLEAN DEFAULT FALSE,
     has_dietary_info BOOLEAN DEFAULT FALSE,
     has_exercise_info BOOLEAN DEFAULT FALSE,
     has_medical_history BOOLEAN DEFAULT FALSE,
     has_lifestyle_info BOOLEAN DEFAULT FALSE,
-    
+
+    -- 后续阶段（预留）
+    engagement_stage VARCHAR(50) DEFAULT 'new_user',
+
     -- 元数据
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     last_interaction_at DATETIME,
-    
+
     FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE,
     INDEX idx_completion_score (completion_score),
-    INDEX idx_onboarding_stage (onboarding_stage)
+    INDEX idx_onboarding_stage (onboarding_stage),
+    INDEX idx_engagement_stage (engagement_stage)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
 """
 
@@ -291,15 +310,16 @@ ALL_TABLES = [
     ("cgm_readings", CGM_READINGS_TABLE),
     ("cgm_pattern_actions", CGM_PATTERN_ACTIONS_TABLE),
     ("activity_logs", ACTIVITY_LOGS_TABLE),
-    
+
     # 对话表
     ("conversations", CONVERSATIONS_TABLE),
     ("conversation_analysis", CONVERSATION_ANALYSIS_TABLE),
-    
+
     # 记忆系统表
     ("user_memories", USER_MEMORIES_TABLE),
     ("user_long_term_memory", USER_LONG_TERM_MEMORY_TABLE),
     ("user_todos", USER_TODOS_TABLE),
+    ("todo_checkins", TODO_CHECKINS_TABLE),
     ("user_onboarding_status", USER_ONBOARDING_STATUS_TABLE),
 ]
 

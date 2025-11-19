@@ -55,10 +55,10 @@ class ConversationRepository(BaseRepository):
             tavus_conversation_id, tavus_conversation_url, tavus_replica_id, tavus_persona_id,
             started_at, ended_at, duration_seconds,
             status, shutdown_reason,
-            json.dumps(transcript, ensure_ascii=False),
+            self._serialize_json_for_db(transcript),
             conversational_context, custom_greeting,
-            json.dumps(properties or {}),
-            json.dumps(metadata or {})
+            self._serialize_json_for_db(properties or {}),
+            self._serialize_json_for_db(metadata or {})
         ))
         
         self.commit()
@@ -98,13 +98,13 @@ class ConversationRepository(BaseRepository):
             conversation_id, user_id, 'retell_voice', f'Voice Call - {retell_call_id[:10]}',
             retell_call_id, retell_agent_id, call_status, call_type,
             started_at, ended_at, duration_seconds,
-            json.dumps(call_cost or {}, ensure_ascii=False),
+            self._serialize_json_for_db(call_cost or {}),
             disconnection_reason,
             transcript,
-            json.dumps(transcript_object, ensure_ascii=False),
+            self._serialize_json_for_db(transcript_object),
             recording_url,
-            json.dumps(properties or {}),
-            json.dumps(metadata or {}),
+            self._serialize_json_for_db(properties or {}),
+            self._serialize_json_for_db(metadata or {}),
             'ended'
         ))
         
@@ -138,10 +138,10 @@ class ConversationRepository(BaseRepository):
             conversation_id, user_id, 'gpt_chat', f'GPT Chat - {conversation_id[:10]}',
             started_at, ended_at, duration_seconds,
             status,
-            json.dumps(transcript, ensure_ascii=False),
+            self._serialize_json_for_db(transcript),
             conversational_context,
-            json.dumps(properties or {}),
-            json.dumps(metadata or {})
+            self._serialize_json_for_db(properties or {}),
+            self._serialize_json_for_db(metadata or {})
         ))
         
         self.commit()
@@ -178,14 +178,14 @@ class ConversationRepository(BaseRepository):
         ''', (
             conversation_id,
             summary,
-            json.dumps(key_topics or [], ensure_ascii=False),
-            json.dumps(extracted_data or {}, ensure_ascii=False),
-            json.dumps(user_intents or [], ensure_ascii=False),
-            json.dumps(user_concerns or [], ensure_ascii=False),
+            self._serialize_json_for_db(key_topics or []),
+            self._serialize_json_for_db(extracted_data or {}),
+            self._serialize_json_for_db(user_intents or []),
+            self._serialize_json_for_db(user_concerns or []),
             user_sentiment,
             engagement_score,
-            json.dumps(action_items or [], ensure_ascii=False),
-            1 if follow_up_needed else 0,
+            self._serialize_json_for_db(action_items or []),
+            self._normalize_bool_for_db(follow_up_needed),
             analysis_model,
             analysis_timestamp or datetime.now().isoformat()
         ))
@@ -202,17 +202,12 @@ class ConversationRepository(BaseRepository):
         
         if row:
             # Parse JSON fields
-            if row.get('key_topics'):
-                row['key_topics'] = json.loads(row['key_topics'])
-            if row.get('extracted_data'):
-                row['extracted_data'] = json.loads(row['extracted_data'])
-            if row.get('user_intents'):
-                row['user_intents'] = json.loads(row['user_intents'])
-            if row.get('user_concerns'):
-                row['user_concerns'] = json.loads(row['user_concerns'])
-            if row.get('action_items'):
-                row['action_items'] = json.loads(row['action_items'])
-            row['follow_up_needed'] = bool(row.get('follow_up_needed'))
+            row['key_topics'] = self._deserialize_json_from_db(row.get('key_topics'))
+            row['extracted_data'] = self._deserialize_json_from_db(row.get('extracted_data'))
+            row['user_intents'] = self._deserialize_json_from_db(row.get('user_intents'))
+            row['user_concerns'] = self._deserialize_json_from_db(row.get('user_concerns'))
+            row['action_items'] = self._deserialize_json_from_db(row.get('action_items'))
+            row['follow_up_needed'] = self._normalize_bool_from_db(row.get('follow_up_needed'))
             
         return row
     
@@ -265,34 +260,55 @@ class ConversationRepository(BaseRepository):
         limit: int = 10
     ) -> List[Dict]:
         """Get user's recent conversations."""
-        query = '''
-        SELECT * FROM conversations 
-        WHERE user_id = ? AND started_at >= datetime('now', '-' || ? || ' days')
-        ORDER BY started_at DESC
-        LIMIT ?
-        '''
+        if self.db_type == 'mysql':
+            # MySQL
+            query = '''
+            SELECT * FROM conversations
+            WHERE user_id = %s AND started_at >= DATE_SUB(NOW(), INTERVAL %s DAY)
+            ORDER BY started_at DESC
+            LIMIT %s
+            '''
+        else:
+            # SQLite
+            query = '''
+            SELECT * FROM conversations
+            WHERE user_id = ? AND started_at >= datetime('now', '-' || ? || ' days')
+            ORDER BY started_at DESC
+            LIMIT ?
+            '''
+
         rows = self.fetchall(query, (user_id, days, limit))
         return [self._parse_conversation(row) for row in rows]
     
     def get_stats(self, user_id: str, days: int = 7) -> Dict[str, Any]:
         """Get conversation statistics."""
+        # 根据数据库类型使用不同的日期函数
+        if self.db_type == 'mysql':
+            # MySQL: DATE_SUB(NOW(), INTERVAL ? DAY)
+            date_filter = "started_at >= DATE_SUB(NOW(), INTERVAL %s DAY)"
+            placeholder = "%s"
+        else:
+            # SQLite: datetime('now', '-' || ? || ' days')
+            date_filter = "started_at >= datetime('now', '-' || ? || ' days')"
+            placeholder = "?"
+        
         # Total conversations
-        total = self.fetchone('''
+        total = self.fetchone(f'''
         SELECT COUNT(*) as total FROM conversations 
-        WHERE user_id = ? AND started_at >= datetime('now', '-' || ? || ' days')
+        WHERE user_id = {placeholder} AND {date_filter}
         ''', (user_id, days))
         
         # By type
-        by_type_rows = self.fetchall('''
+        by_type_rows = self.fetchall(f'''
         SELECT conversation_type, COUNT(*) as count FROM conversations 
-        WHERE user_id = ? AND started_at >= datetime('now', '-' || ? || ' days')
+        WHERE user_id = {placeholder} AND {date_filter}
         GROUP BY conversation_type
         ''', (user_id, days))
         
         # Total duration
-        duration = self.fetchone('''
+        duration = self.fetchone(f'''
         SELECT SUM(duration_seconds) as total_duration FROM conversations 
-        WHERE user_id = ? AND started_at >= datetime('now', '-' || ? || ' days')
+        WHERE user_id = {placeholder} AND {date_filter}
         AND duration_seconds IS NOT NULL
         ''', (user_id, days))
         
@@ -310,23 +326,18 @@ class ConversationRepository(BaseRepository):
     def _parse_conversation(self, row: Dict) -> Dict:
         """Parse conversation row with JSON fields."""
         conv_type = row.get('conversation_type')
-        
+
         # Voice chat transcript is plain text
         if conv_type == 'retell_voice':
-            if row.get('transcript_object'):
-                row['transcript_object'] = json.loads(row['transcript_object'])
-            if row.get('call_cost'):
-                row['call_cost'] = json.loads(row['call_cost'])
+            row['transcript_object'] = self._deserialize_json_from_db(row.get('transcript_object'))
+            row['call_cost'] = self._deserialize_json_from_db(row.get('call_cost'))
         else:
             # Video/text chat transcript is JSON
-            if row.get('transcript'):
-                row['transcript'] = json.loads(row['transcript'])
-        
-        if row.get('properties'):
-            row['properties'] = json.loads(row['properties'])
-        if row.get('metadata'):
-            row['metadata'] = json.loads(row['metadata'])
-        
+            row['transcript'] = self._deserialize_json_from_db(row.get('transcript'))
+
+        row['properties'] = self._deserialize_json_from_db(row.get('properties'))
+        row['metadata'] = self._deserialize_json_from_db(row.get('metadata'))
+
         return row
 
 

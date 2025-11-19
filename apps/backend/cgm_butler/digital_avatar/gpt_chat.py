@@ -10,12 +10,20 @@ from typing import List, Dict, Optional
 import json
 from datetime import datetime
 
-# 添加父目录到路径
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+# 添加项目根目录到路径 (用于 shared 模块)
+# gpt_chat.py -> digital_avatar -> cgm_butler -> backend -> apps -> my-glucose-pal (5层)
+current_file = os.path.abspath(__file__)
+project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(current_file)))))
+if project_root not in sys.path:
+    sys.path.insert(0, project_root)
 
-from digital_avatar.config import AvatarConfig
-from digital_avatar.cgm_tools import CGMTools, FUNCTION_DEFINITIONS
-from database.conversation_manager import ConversationManager
+# 使用相对导入
+from .config import AvatarConfig
+from .cgm_tools import CGMTools, FUNCTION_DEFINITIONS
+from .memory_service import MemoryService
+
+# 使用新的 shared/database
+from shared.database import get_connection, ConversationRepository
 
 try:
     from openai import OpenAI
@@ -38,7 +46,12 @@ class GPTChatManager:
         self.client = OpenAI(api_key=self.api_key)
         self.model = AvatarConfig.OPENAI_MODEL
         self.cgm_tools = CGMTools()
-        self.conversation_db = ConversationManager()
+        
+        # 使用新的 Repository 模式
+        self.db_conn = get_connection()
+        self.conversation_repo = ConversationRepository(self.db_conn)
+        
+        self.memory_service = MemoryService(openai_api_key=self.api_key)
         
         # 对话历史
         self.conversations = {}  # user_id -> messages
@@ -274,8 +287,8 @@ You are supportive, sophisticated, and always have the user's best interests at 
             # 获取初始context（从系统消息提取）
             system_message = self.conversations[user_id][0]["content"] if self.conversations[user_id] else ""
             
-            # 保存到数据库
-            conv_id = self.conversation_db.save_gpt_conversation(
+            # 保存到数据库 (使用新的 Repository)
+            conv_id = self.conversation_repo.save_gpt_conversation(
                 user_id=user_id,
                 transcript=self.conversation_transcript[user_id],
                 conversational_context=system_message,
@@ -283,6 +296,20 @@ You are supportive, sophisticated, and always have the user's best interests at 
                 ended_at=end_time.isoformat(),
                 duration_seconds=duration_seconds,
                 status='ended'
+            )
+            self.db_conn.commit()
+            
+            # 获取用户信息（用于 memory service）
+            user_info = self.cgm_tools.get_user_info(user_id)
+            user_name = user_info.get('name', 'User')
+            
+            # 处理记忆和 TODO（异步处理，不阻塞返回）
+            memory_result = self.memory_service.process_conversation(
+                user_id=user_id,
+                conversation_id=conv_id,
+                channel='gpt_chat',
+                transcript=self.conversation_transcript[user_id],
+                user_name=user_name
             )
             
             # 清理内存
@@ -294,7 +321,9 @@ You are supportive, sophisticated, and always have the user's best interests at 
                 "success": True,
                 "conversation_id": conv_id,
                 "message": "对话已保存",
-                "duration_seconds": duration_seconds
+                "duration_seconds": duration_seconds,
+                "memory_processed": memory_result.get('success', False),
+                "todos_created": memory_result.get('todos_count', 0)
             }
             
         except Exception as e:

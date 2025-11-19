@@ -1,44 +1,31 @@
-import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { MobileCallInterface } from './MobileCallInterface';
-import { CallResults } from './CallResults';
 
-export function VoiceChat() {
-  const [view, setView] = useState<'call' | 'results'>('call');
-  const [callId, setCallId] = useState<string | null>(null);
-  const [transcript, setTranscript] = useState<any[]>([]);
+function VoiceChat() {
   const navigate = useNavigate();
 
   const handleCallEnded = (endedCallId: string | null, endedTranscript: any[]) => {
-    setCallId(endedCallId);
-    setTranscript(endedTranscript);
-    setView('results');
+    // Navigate to CallResultsPage with state
+    // Note: We need to get conversationId and durationSeconds from the call
+    // For now, using callId as conversationId (will be set by backend in saveCallData response)
+    navigate('/olivia/call-results', {
+      state: {
+        conversationId: endedCallId || 'unknown',
+        transcript: endedTranscript,
+        durationSeconds: 0, // TODO: Pass actual duration from MobileCallInterface
+      },
+    });
   };
 
   const handleBackFromCall = () => {
     navigate('/');
   };
 
-  const handleBackFromResults = () => {
-    navigate('/');
-  };
-
   return (
-    <>
-      {view === 'call' && (
-        <MobileCallInterface 
-          onBack={handleBackFromCall}
-          onCallEnded={handleCallEnded}
-        />
-      )}
-      {view === 'results' && (
-        <CallResults 
-          onBack={handleBackFromResults}
-          callId={callId}
-          transcript={transcript}
-        />
-      )}
-    </>
+    <MobileCallInterface
+      onBack={handleBackFromCall}
+      onCallEnded={handleCallEnded}
+    />
   );
 }
 

@@ -1,0 +1,1 @@
+Hi {{user_name}}! I'm Olivia, your CGM health coach. I'm here to support you on your health journey - think of me as someone who checks in on how you're doing, gives you personalized tips, helps you understand what's going on with your health, and just chats with you about life. What's going on with you today?

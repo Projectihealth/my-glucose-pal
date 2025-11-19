@@ -11,7 +11,7 @@ import { useTextChat } from "../../../hooks/olivia/useTextChat";
 import { MessageList } from './MessageList';
 import { MessageInput } from './MessageInput';
 
-export function TextChat() {
+function TextChat() {
   const navigate = useNavigate();
   const userId = import.meta.env.VITE_DEFAULT_USER_ID || 'user_001';
   const { messages, isLoading, error, sendMessage, endChat } = useTextChat(userId);

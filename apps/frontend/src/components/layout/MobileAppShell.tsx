@@ -34,6 +34,11 @@ const formatTime = () =>
 
 export const MobileAppShell = ({ children, className }: MobileAppShellProps) => {
   const [time, setTime] = useState<string>(formatTime());
+  const [isBetaMode, setIsBetaMode] = useState<boolean>(() => {
+    // Initialize from localStorage
+    const stored = localStorage.getItem('betaMode');
+    return stored === 'true';
+  });
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -41,6 +46,20 @@ export const MobileAppShell = ({ children, className }: MobileAppShellProps) => 
     const interval = setInterval(() => setTime(formatTime()), 60_000);
     return () => clearInterval(interval);
   }, []);
+
+  const toggleBetaMode = () => {
+    const newBetaMode = !isBetaMode;
+    setIsBetaMode(newBetaMode);
+    localStorage.setItem('betaMode', String(newBetaMode));
+
+    // Dispatch custom event to notify other components
+    window.dispatchEvent(new Event('betaModeChange'));
+
+    // If currently on learn-more page, navigate to trigger re-render
+    if (location.pathname.startsWith('/learn-more')) {
+      navigate('/learn-more', { replace: true });
+    }
+  };
 
   const handleNavClick = (item: (typeof navItems)[number]) => {
     if (item.path) {
@@ -63,7 +82,21 @@ export const MobileAppShell = ({ children, className }: MobileAppShellProps) => 
 
         <div className="flex flex-col h-full">
           <header className="flex items-center justify-between px-7 pt-6 pb-4 text-[13px] font-semibold text-slate-500">
-            <span>{time}</span>
+            <div className="flex items-center gap-2">
+              <span>{time}</span>
+              <button
+                onClick={toggleBetaMode}
+                className={cn(
+                  "px-2 py-0.5 rounded-md text-[10px] font-bold tracking-wider transition-all",
+                  isBetaMode
+                    ? "bg-gradient-to-r from-[#4FC3F7] to-[#4A6FE3] text-white shadow-sm"
+                    : "bg-slate-200 text-slate-500 hover:bg-slate-300"
+                )}
+                title={isBetaMode ? "Beta Mode: ON (Click to disable)" : "Beta Mode: OFF (Click to enable)"}
+              >
+                BETA
+              </button>
+            </div>
             <div className="flex items-center gap-1 text-slate-500">
               <Signal className="w-4 h-4" />
               <Wifi className="w-4 h-4" />

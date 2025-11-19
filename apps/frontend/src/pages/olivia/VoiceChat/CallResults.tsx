@@ -116,50 +116,73 @@ export function CallResults({ onBack, callId, transcript }: CallResultsProps) {
             {/* Summary Tab */}
             {activeTab === 'summary' && summary && !isLoading && (
               <div className="space-y-3">
-                <div className="bg-[#EEF2FF] rounded-2xl p-4 border border-blue-100">
-                  <div className="flex items-start gap-3">
-                    <Utensils className="w-5 h-5 text-[#5B7FF3] mt-0.5 flex-shrink-0" />
-                    <div className="flex-1">
-                      <h4 className="text-gray-800 text-sm mb-1">Meals</h4>
-                      <div className="text-gray-600 text-sm leading-relaxed space-y-1">
-                        <p><strong>Breakfast:</strong> {summary.meals.breakfast}</p>
-                        <p><strong>Lunch:</strong> {summary.meals.lunch}</p>
-                        <p><strong>Dinner:</strong> {summary.meals.dinner}</p>
-                        <p><strong>Snacks:</strong> {summary.meals.snacks}</p>
+                {/* Meals Section */}
+                {summary.meals && (
+                  <div className="bg-[#EEF2FF] rounded-2xl p-4 border border-blue-100">
+                    <div className="flex items-start gap-3">
+                      <Utensils className="w-5 h-5 text-[#5B7FF3] mt-0.5 flex-shrink-0" />
+                      <div className="flex-1">
+                        <h4 className="text-gray-800 text-sm mb-1">Meals</h4>
+                        <div className="text-gray-600 text-sm leading-relaxed space-y-1">
+                          {summary.meals.breakfast && <p><strong>Breakfast:</strong> {summary.meals.breakfast}</p>}
+                          {summary.meals.lunch && <p><strong>Lunch:</strong> {summary.meals.lunch}</p>}
+                          {summary.meals.dinner && <p><strong>Dinner:</strong> {summary.meals.dinner}</p>}
+                          {summary.meals.snacks && <p><strong>Snacks:</strong> {summary.meals.snacks}</p>}
+                          {!summary.meals.breakfast && !summary.meals.lunch && !summary.meals.dinner && !summary.meals.snacks && (
+                            <p className="text-gray-400 italic">No meal information available</p>
+                          )}
+                        </div>
                       </div>
                     </div>
                   </div>
-                </div>
+                )}
                 
-                <div className="bg-[#EEF2FF] rounded-2xl p-4 border border-blue-100">
-                  <div className="flex items-start gap-3">
-                    <Activity className="w-5 h-5 text-[#5B7FF3] mt-0.5 flex-shrink-0" />
-                    <div className="flex-1">
-                      <h4 className="text-gray-800 text-sm mb-1">Exercise</h4>
-                      <p className="text-gray-600 text-sm leading-relaxed">{summary.exercise}</p>
+                {/* Exercise Section */}
+                {summary.exercise && (
+                  <div className="bg-[#EEF2FF] rounded-2xl p-4 border border-blue-100">
+                    <div className="flex items-start gap-3">
+                      <Activity className="w-5 h-5 text-[#5B7FF3] mt-0.5 flex-shrink-0" />
+                      <div className="flex-1">
+                        <h4 className="text-gray-800 text-sm mb-1">Exercise</h4>
+                        <p className="text-gray-600 text-sm leading-relaxed">{summary.exercise}</p>
+                      </div>
                     </div>
                   </div>
-                </div>
+                )}
                 
-                <div className="bg-[#EEF2FF] rounded-2xl p-4 border border-blue-100">
-                  <div className="flex items-start gap-3">
-                    <Moon className="w-5 h-5 text-[#5B7FF3] mt-0.5 flex-shrink-0" />
-                    <div className="flex-1">
-                      <h4 className="text-gray-800 text-sm mb-1">Sleep Pattern</h4>
-                      <p className="text-gray-600 text-sm leading-relaxed">{summary.sleep}</p>
+                {/* Sleep Section */}
+                {summary.sleep && (
+                  <div className="bg-[#EEF2FF] rounded-2xl p-4 border border-blue-100">
+                    <div className="flex items-start gap-3">
+                      <Moon className="w-5 h-5 text-[#5B7FF3] mt-0.5 flex-shrink-0" />
+                      <div className="flex-1">
+                        <h4 className="text-gray-800 text-sm mb-1">Sleep Pattern</h4>
+                        <p className="text-gray-600 text-sm leading-relaxed">{summary.sleep}</p>
+                      </div>
                     </div>
                   </div>
-                </div>
+                )}
                 
-                <div className="bg-[#EEF2FF] rounded-2xl p-4 border border-blue-100">
-                  <div className="flex items-start gap-3">
-                    <FileText className="w-5 h-5 text-[#5B7FF3] mt-0.5 flex-shrink-0" />
-                    <div className="flex-1">
-                      <h4 className="text-gray-800 text-sm mb-1">Additional Notes</h4>
-                      <p className="text-gray-600 text-sm leading-relaxed">{summary.additional_notes}</p>
+                {/* Additional Notes Section */}
+                {summary.additional_notes && (
+                  <div className="bg-[#EEF2FF] rounded-2xl p-4 border border-blue-100">
+                    <div className="flex items-start gap-3">
+                      <FileText className="w-5 h-5 text-[#5B7FF3] mt-0.5 flex-shrink-0" />
+                      <div className="flex-1">
+                        <h4 className="text-gray-800 text-sm mb-1">Additional Notes</h4>
+                        <p className="text-gray-600 text-sm leading-relaxed">{summary.additional_notes}</p>
+                      </div>
                     </div>
                   </div>
-                </div>
+                )}
+                
+                {/* No data message */}
+                {!summary.meals && !summary.exercise && !summary.sleep && !summary.additional_notes && (
+                  <div className="text-center text-gray-500 py-8">
+                    <p>No summary data available yet.</p>
+                    <p className="text-sm mt-2">The conversation may have been too short to generate a summary.</p>
+                  </div>
+                )}
               </div>
             )}
 

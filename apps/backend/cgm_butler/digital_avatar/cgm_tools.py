@@ -25,11 +25,15 @@ class CGMTools:
         Initialize CGM tools.
         
         Args:
-            db_path: Path to CGM database. If None, uses default.
+            db_path: Path to CGM database. If None, uses environment variable or default.
         """
         if db_path is None:
-            project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-            db_path = os.path.join(project_root, 'database', 'cgm_butler.db')
+            # 优先使用环境变量
+            db_path = os.getenv('CGM_DB_PATH')
+            if db_path is None:
+                # 回退到默认路径
+                project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+                db_path = os.path.join(project_root, 'database', 'cgm_butler.db')
         
         self.db_path = db_path
         self.pattern_identifier = CGMPatternIdentifier(db_path=db_path)

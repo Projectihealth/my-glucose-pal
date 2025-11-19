@@ -1,0 +1,346 @@
+"""
+Conversation Repository
+
+Handles all conversation-related database operations.
+This is a refactored version of the original ConversationManager.
+"""
+
+import json
+import uuid
+from datetime import datetime
+from typing import Dict, List, Optional, Any
+
+from .base import BaseRepository
+
+
+class ConversationRepository(BaseRepository):
+    """Repository for conversation operations."""
+    
+    # ============================================================
+    # Save Methods
+    # ============================================================
+    
+    def save_tavus_conversation(
+        self,
+        user_id: str,
+        tavus_conversation_id: str,
+        tavus_conversation_url: str,
+        tavus_replica_id: str,
+        tavus_persona_id: str,
+        transcript: List[Dict],
+        conversational_context: str,
+        custom_greeting: str,
+        started_at: str,
+        ended_at: Optional[str] = None,
+        duration_seconds: Optional[int] = None,
+        status: str = 'active',
+        shutdown_reason: Optional[str] = None,
+        properties: Optional[Dict] = None,
+        metadata: Optional[Dict] = None
+    ) -> str:
+        """Save Tavus video conversation."""
+        conversation_id = str(uuid.uuid4())
+        
+        self.execute('''
+        INSERT INTO conversations (
+            conversation_id, user_id, conversation_type, conversation_name,
+            tavus_conversation_id, tavus_conversation_url, tavus_replica_id, tavus_persona_id,
+            started_at, ended_at, duration_seconds,
+            status, shutdown_reason,
+            transcript, conversational_context, custom_greeting,
+            properties, metadata
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ''', (
+            conversation_id, user_id, 'tavus_video', f'Tavus Video - {tavus_conversation_id[:10]}',
+            tavus_conversation_id, tavus_conversation_url, tavus_replica_id, tavus_persona_id,
+            started_at, ended_at, duration_seconds,
+            status, shutdown_reason,
+            self._serialize_json_for_db(transcript),
+            conversational_context, custom_greeting,
+            self._serialize_json_for_db(properties or {}),
+            self._serialize_json_for_db(metadata or {})
+        ))
+        
+        self.commit()
+        return conversation_id
+    
+    def save_retell_conversation(
+        self,
+        user_id: str,
+        retell_call_id: str,
+        retell_agent_id: str,
+        call_status: str,
+        call_type: str,
+        started_at: str,
+        transcript: str,
+        transcript_object: List[Dict],
+        ended_at: Optional[str] = None,
+        duration_seconds: Optional[float] = None,
+        call_cost: Optional[Dict] = None,
+        disconnection_reason: Optional[str] = None,
+        recording_url: Optional[str] = None,
+        properties: Optional[Dict] = None,
+        metadata: Optional[Dict] = None
+    ) -> str:
+        """Save Retell voice conversation."""
+        conversation_id = str(uuid.uuid4())
+        
+        self.execute('''
+        INSERT INTO conversations (
+            conversation_id, user_id, conversation_type, conversation_name,
+            retell_call_id, retell_agent_id, call_status, call_type,
+            started_at, ended_at, duration_seconds,
+            call_cost, disconnection_reason,
+            transcript, transcript_object, recording_url,
+            properties, metadata, status
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ''', (
+            conversation_id, user_id, 'retell_voice', f'Voice Call - {retell_call_id[:10]}',
+            retell_call_id, retell_agent_id, call_status, call_type,
+            started_at, ended_at, duration_seconds,
+            self._serialize_json_for_db(call_cost or {}),
+            disconnection_reason,
+            transcript,
+            self._serialize_json_for_db(transcript_object),
+            recording_url,
+            self._serialize_json_for_db(properties or {}),
+            self._serialize_json_for_db(metadata or {}),
+            'ended'
+        ))
+        
+        self.commit()
+        return conversation_id
+    
+    def save_gpt_conversation(
+        self,
+        user_id: str,
+        transcript: List[Dict],
+        conversational_context: str,
+        started_at: str,
+        ended_at: Optional[str] = None,
+        duration_seconds: Optional[int] = None,
+        status: str = 'active',
+        properties: Optional[Dict] = None,
+        metadata: Optional[Dict] = None
+    ) -> str:
+        """Save GPT text conversation."""
+        conversation_id = str(uuid.uuid4())
+        
+        self.execute('''
+        INSERT INTO conversations (
+            conversation_id, user_id, conversation_type, conversation_name,
+            started_at, ended_at, duration_seconds,
+            status,
+            transcript, conversational_context,
+            properties, metadata
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ''', (
+            conversation_id, user_id, 'gpt_chat', f'GPT Chat - {conversation_id[:10]}',
+            started_at, ended_at, duration_seconds,
+            status,
+            self._serialize_json_for_db(transcript),
+            conversational_context,
+            self._serialize_json_for_db(properties or {}),
+            self._serialize_json_for_db(metadata or {})
+        ))
+        
+        self.commit()
+        return conversation_id
+    
+    # ============================================================
+    # Analysis Methods
+    # ============================================================
+    
+    def save_analysis(
+        self,
+        conversation_id: str,
+        summary: Optional[str] = None,
+        key_topics: Optional[List[str]] = None,
+        extracted_data: Optional[Dict] = None,
+        user_intents: Optional[List[str]] = None,
+        user_concerns: Optional[List[str]] = None,
+        user_sentiment: Optional[str] = None,
+        engagement_score: Optional[float] = None,
+        action_items: Optional[List[Dict]] = None,
+        follow_up_needed: bool = False,
+        analysis_model: str = 'gpt-4o',
+        analysis_timestamp: Optional[str] = None
+    ) -> int:
+        """Save conversation analysis to database."""
+        
+        self.execute('''
+        INSERT INTO conversation_analysis (
+            conversation_id, summary, key_topics, extracted_data,
+            user_intents, user_concerns, user_sentiment,
+            engagement_score, action_items, follow_up_needed,
+            analysis_model, analysis_timestamp
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ''', (
+            conversation_id,
+            summary,
+            self._serialize_json_for_db(key_topics or []),
+            self._serialize_json_for_db(extracted_data or {}),
+            self._serialize_json_for_db(user_intents or []),
+            self._serialize_json_for_db(user_concerns or []),
+            user_sentiment,
+            engagement_score,
+            self._serialize_json_for_db(action_items or []),
+            self._normalize_bool_for_db(follow_up_needed),
+            analysis_model,
+            analysis_timestamp or datetime.now().isoformat()
+        ))
+        
+        self.commit()
+        return self.cursor.lastrowid
+    
+    def get_analysis(self, conversation_id: str) -> Optional[Dict]:
+        """Get conversation analysis by conversation ID."""
+        row = self.fetchone(
+            'SELECT * FROM conversation_analysis WHERE conversation_id = ?',
+            (conversation_id,)
+        )
+        
+        if row:
+            # Parse JSON fields
+            row['key_topics'] = self._deserialize_json_from_db(row.get('key_topics'))
+            row['extracted_data'] = self._deserialize_json_from_db(row.get('extracted_data'))
+            row['user_intents'] = self._deserialize_json_from_db(row.get('user_intents'))
+            row['user_concerns'] = self._deserialize_json_from_db(row.get('user_concerns'))
+            row['action_items'] = self._deserialize_json_from_db(row.get('action_items'))
+            row['follow_up_needed'] = self._normalize_bool_from_db(row.get('follow_up_needed'))
+            
+        return row
+    
+    # ============================================================
+    # Query Methods
+    # ============================================================
+    
+    def get_by_id(self, conversation_id: str) -> Optional[Dict]:
+        """Get conversation by ID."""
+        row = self.fetchone(
+            'SELECT * FROM conversations WHERE conversation_id = ?',
+            (conversation_id,)
+        )
+        
+        if row:
+            return self._parse_conversation(row)
+        return None
+    
+    def get_user_conversations(
+        self,
+        user_id: str,
+        limit: int = 20,
+        offset: int = 0,
+        conversation_type: Optional[str] = None
+    ) -> List[Dict]:
+        """Get user's conversations."""
+        if conversation_type:
+            query = '''
+            SELECT * FROM conversations 
+            WHERE user_id = ? AND conversation_type = ?
+            ORDER BY started_at DESC
+            LIMIT ? OFFSET ?
+            '''
+            rows = self.fetchall(query, (user_id, conversation_type, limit, offset))
+        else:
+            query = '''
+            SELECT * FROM conversations 
+            WHERE user_id = ?
+            ORDER BY started_at DESC
+            LIMIT ? OFFSET ?
+            '''
+            rows = self.fetchall(query, (user_id, limit, offset))
+        
+        return [self._parse_conversation(row) for row in rows]
+    
+    def get_recent_conversations(
+        self,
+        user_id: str,
+        days: int = 7,
+        limit: int = 10
+    ) -> List[Dict]:
+        """Get user's recent conversations."""
+        if self.db_type == 'mysql':
+            # MySQL
+            query = '''
+            SELECT * FROM conversations
+            WHERE user_id = %s AND started_at >= DATE_SUB(NOW(), INTERVAL %s DAY)
+            ORDER BY started_at DESC
+            LIMIT %s
+            '''
+        else:
+            # SQLite
+            query = '''
+            SELECT * FROM conversations
+            WHERE user_id = ? AND started_at >= datetime('now', '-' || ? || ' days')
+            ORDER BY started_at DESC
+            LIMIT ?
+            '''
+
+        rows = self.fetchall(query, (user_id, days, limit))
+        return [self._parse_conversation(row) for row in rows]
+    
+    def get_stats(self, user_id: str, days: int = 7) -> Dict[str, Any]:
+        """Get conversation statistics."""
+        # 根据数据库类型使用不同的日期函数
+        if self.db_type == 'mysql':
+            # MySQL: DATE_SUB(NOW(), INTERVAL ? DAY)
+            date_filter = "started_at >= DATE_SUB(NOW(), INTERVAL %s DAY)"
+            placeholder = "%s"
+        else:
+            # SQLite: datetime('now', '-' || ? || ' days')
+            date_filter = "started_at >= datetime('now', '-' || ? || ' days')"
+            placeholder = "?"
+        
+        # Total conversations
+        total = self.fetchone(f'''
+        SELECT COUNT(*) as total FROM conversations 
+        WHERE user_id = {placeholder} AND {date_filter}
+        ''', (user_id, days))
+        
+        # By type
+        by_type_rows = self.fetchall(f'''
+        SELECT conversation_type, COUNT(*) as count FROM conversations 
+        WHERE user_id = {placeholder} AND {date_filter}
+        GROUP BY conversation_type
+        ''', (user_id, days))
+        
+        # Total duration
+        duration = self.fetchone(f'''
+        SELECT SUM(duration_seconds) as total_duration FROM conversations 
+        WHERE user_id = {placeholder} AND {date_filter}
+        AND duration_seconds IS NOT NULL
+        ''', (user_id, days))
+        
+        return {
+            'total_conversations': total['total'] if total else 0,
+            'by_type': {row['conversation_type']: row['count'] for row in by_type_rows},
+            'total_duration_seconds': duration['total_duration'] if duration and duration['total_duration'] else 0,
+            'period_days': days
+        }
+    
+    # ============================================================
+    # Helper Methods
+    # ============================================================
+    
+    def _parse_conversation(self, row: Dict) -> Dict:
+        """Parse conversation row with JSON fields."""
+        conv_type = row.get('conversation_type')
+
+        # Voice chat transcript is plain text
+        if conv_type == 'retell_voice':
+            row['transcript_object'] = self._deserialize_json_from_db(row.get('transcript_object'))
+            row['call_cost'] = self._deserialize_json_from_db(row.get('call_cost'))
+        else:
+            # Video/text chat transcript is JSON
+            row['transcript'] = self._deserialize_json_from_db(row.get('transcript'))
+
+        row['properties'] = self._deserialize_json_from_db(row.get('properties'))
+        row['metadata'] = self._deserialize_json_from_db(row.get('metadata'))
+
+        return row
+
+
+# Backward compatibility: ConversationManager alias
+ConversationManager = ConversationRepository
+

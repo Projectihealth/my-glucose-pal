@@ -2,6 +2,7 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
   Select,
@@ -14,6 +15,13 @@ import { useEffect, useMemo, useState } from "react";
 import { useUserPreferences } from "@/context/UserPreferencesContext";
 import type { SupportedLanguage } from "@/context/UserPreferencesContext";
 import { useToast } from "@/components/ui/use-toast";
+import { getStoredUserId, setStoredUserId } from "@/utils/userUtils";
+
+interface User {
+  user_id: string;
+  name: string;
+  conditions: string;
+}
 
 const Profile = () => {
   const { preferences, updatePreferences } = useUserPreferences();
@@ -30,9 +38,57 @@ const Profile = () => {
     language: preferences.language,
   });
 
+  // Account switching state
+  const [currentUserId, setCurrentUserId] = useState<string>(() => getStoredUserId());
+  const [availableUsers, setAvailableUsers] = useState<User[]>([]);
+  const [selectedUserId, setSelectedUserId] = useState<string>("");
+  const [manualUserId, setManualUserId] = useState<string>("");
+
   useEffect(() => {
     setDraft({ timezone: preferences.timezone, language: preferences.language });
   }, [preferences.timezone, preferences.language]);
+
+  // Fetch available users from backend
+  useEffect(() => {
+    const fetchUsers = async () => {
+      try {
+        const backendUrl = import.meta.env.VITE_BACKEND_URL || "http://localhost:5000";
+        const response = await fetch(`${backendUrl}/api/users`);
+        if (response.ok) {
+          const users = await response.json();
+          setAvailableUsers(users);
+        }
+      } catch (error) {
+        console.warn("Failed to fetch users:", error);
+      }
+    };
+    fetchUsers();
+  }, []);
+
+  const handleSwitchAccount = (userId: string) => {
+    if (!userId || userId === currentUserId) return;
+
+    try {
+      setStoredUserId(userId);
+      setCurrentUserId(userId);
+      toast({
+        title: "Switching account...",
+        description: `Switching to user: ${userId}`,
+      });
+
+      // Reload the page to refresh all data
+      setTimeout(() => {
+        window.location.reload();
+      }, 500);
+    } catch (error) {
+      console.error("Failed to switch account:", error);
+      toast({
+        title: "Error",
+        description: "Failed to switch account",
+        variant: "destructive",
+      });
+    }
+  };
 
   const profileCopy = useMemo(
     () => ({
@@ -223,7 +279,7 @@ const Profile = () => {
         </Card>
       </section>
 
-      <section className="px-6 pb-16 space-y-4">
+      <section className="px-6 pb-4 space-y-4">
         <h2 className="text-lg font-semibold">{profileCopy.accountHeading}</h2>
         <Card className="p-4 rounded-3xl border-destructive/30 bg-destructive/5 flex flex-col gap-3">
           <p className="text-sm text-destructive">
@@ -234,6 +290,81 @@ const Profile = () => {
             <Button variant="outline" className="w-full">{profileCopy.export}</Button>
             <Button variant="destructive" className="w-full">{profileCopy.deactivate}</Button>
           </div>
+        </Card>
+      </section>
+
+      {/* Account Switching Section */}
+      <section className="px-6 pb-16 space-y-4">
+        <h2 className="text-lg font-semibold">Switch Account (Testing)</h2>
+        <Card className="p-4 rounded-3xl border-border/60 space-y-4">
+          <div className="space-y-2">
+            <Label className="text-sm font-medium">Current User ID</Label>
+            <div className="p-3 bg-muted rounded-lg">
+              <p className="text-sm font-mono">{currentUserId}</p>
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="user-select">Select Existing User</Label>
+            <Select
+              value={selectedUserId}
+              onValueChange={(value) => {
+                setSelectedUserId(value);
+                setManualUserId(""); // Clear manual input when selecting from dropdown
+              }}
+            >
+              <SelectTrigger id="user-select">
+                <SelectValue placeholder="Choose a user account..." />
+              </SelectTrigger>
+              <SelectContent>
+                {availableUsers.map((user) => (
+                  <SelectItem key={user.user_id} value={user.user_id}>
+                    {user.user_id} - {user.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="relative">
+            <div className="absolute inset-0 flex items-center">
+              <span className="w-full border-t" />
+            </div>
+            <div className="relative flex justify-center text-xs uppercase">
+              <span className="bg-background px-2 text-muted-foreground">Or</span>
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="manual-user-id">Enter User ID Manually</Label>
+            <Input
+              id="manual-user-id"
+              type="text"
+              placeholder="e.g., user_001"
+              value={manualUserId}
+              onChange={(e) => {
+                setManualUserId(e.target.value);
+                setSelectedUserId(""); // Clear dropdown when typing manually
+              }}
+            />
+          </div>
+
+          <Button
+            className="w-full gradient-primary text-white border-0"
+            onClick={() => {
+              const targetUserId = manualUserId || selectedUserId;
+              if (targetUserId) {
+                handleSwitchAccount(targetUserId);
+              }
+            }}
+            disabled={!manualUserId && !selectedUserId}
+          >
+            Switch Account
+          </Button>
+
+          <p className="text-xs text-muted-foreground text-center">
+            Switching will reload the page with the selected user's data
+          </p>
         </Card>
       </section>
     </div>

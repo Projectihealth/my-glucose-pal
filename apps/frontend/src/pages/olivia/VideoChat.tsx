@@ -10,7 +10,7 @@ import { useTavusConversation } from "../../hooks/olivia/useTavusConversation";
 import { CVIProvider } from '@/components/olivia/cvi/components/cvi-provider';
 import { Conversation } from '@/components/olivia/cvi/components/conversation';
 
-export function VideoChat() {
+function VideoChat() {
   const navigate = useNavigate();
   const userId = import.meta.env.VITE_DEFAULT_USER_ID || 'user_001';
   const { conversation, isLoading, error, endConversation, retry } = useTavusConversation(userId);

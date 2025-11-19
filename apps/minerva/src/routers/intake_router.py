@@ -23,6 +23,11 @@ if project_root not in sys.path:
 from shared.database import get_connection, ConversationRepository, MemoryRepository
 
 from ..services.intake_service import create_intake_web_call, generate_call_summary, analyze_goal_achievement, update_llm_settings
+from ..services.call_results_service import (
+    generate_conversation_summary,
+    generate_and_save_goals,
+    generate_todo_suggestions
+)
 
 # 创建路由器
 intake_router = APIRouter()
@@ -440,6 +445,187 @@ async def save_analysis_endpoint(request: Request):
         raise
     except Exception as e:
         logger.error(f"==== Error saving analysis: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail=f"Internal server error: {str(e)}"
+        )
+
+
+# ============================================================
+# Call Results Endpoints (用于 CallResultsPage)
+# ============================================================
+
+@intake_router.post("/generate-conversation-summary")
+async def generate_conversation_summary_endpoint(request: Request):
+    """
+    生成对话摘要（纯文本格式，用于 CallResultsPage 展示）
+
+    请求体:
+        {
+            "transcript": [...],  # 对话记录
+            "duration_seconds": 754  # 通话时长（秒）
+        }
+
+    返回:
+        {
+            "status": "success",
+            "summary": {
+                "overview": "纯文本总结（2-3句话）",
+                "key_findings": ["要点1", "要点2"],
+                "duration": "12 min 34 sec"
+            }
+        }
+    """
+    try:
+        body = await request.json()
+        transcript = body.get('transcript', [])
+        duration_seconds = body.get('duration_seconds', 0)
+
+        if not transcript:
+            raise HTTPException(
+                status_code=400,
+                detail="transcript is required"
+            )
+
+        logger.info("==== Generating conversation summary")
+
+        summary = await generate_conversation_summary(transcript, duration_seconds)
+
+        return JSONResponse(
+            status_code=200,
+            content={
+                "status": "success",
+                "summary": summary
+            }
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"==== Error generating conversation summary: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail=f"Internal server error: {str(e)}"
+        )
+
+
+@intake_router.post("/generate-goals")
+async def generate_goals_endpoint(request: Request):
+    """
+    生成并保存健康目标（对比历史状态更新）
+
+    请求体:
+        {
+            "user_id": "user_001",
+            "conversation_id": "conv_xxx",
+            "transcript": [...]
+        }
+
+    返回:
+        {
+            "status": "success",
+            "goals": [
+                {
+                    "id": "goal_1",
+                    "title": "...",
+                    "status": "IN PROGRESS",
+                    "currentBehavior": "...",
+                    "recommendation": "..."
+                }
+            ]
+        }
+    """
+    try:
+        body = await request.json()
+        user_id = body.get('user_id')
+        conversation_id = body.get('conversation_id')
+        transcript = body.get('transcript', [])
+
+        if not user_id or not conversation_id:
+            raise HTTPException(
+                status_code=400,
+                detail="user_id and conversation_id are required"
+            )
+
+        logger.info(f"==== Generating goals for user {user_id}")
+
+        result = await generate_and_save_goals(user_id, conversation_id, transcript)
+
+        return JSONResponse(
+            status_code=200,
+            content={
+                "status": "success",
+                **result
+            }
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"==== Error generating goals: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail=f"Internal server error: {str(e)}"
+        )
+
+
+@intake_router.post("/generate-todo-suggestions")
+async def generate_todo_suggestions_endpoint(request: Request):
+    """
+    生成 TODO 建议（不保存到数据库）
+
+    请求体:
+        {
+            "user_id": "user_001",
+            "conversation_id": "conv_xxx",
+            "transcript": [...]
+        }
+
+    返回:
+        {
+            "status": "success",
+            "suggestions": [
+                {
+                    "title": "...",
+                    "category": "diet",
+                    "health_benefit": "...",
+                    "time_of_day": "09:00-10:00",
+                    "time_description": "Before work",
+                    "target_count": 7,
+                    "priority": "high",
+                    "recommendation_tag": "ai_recommended"
+                }
+            ]
+        }
+    """
+    try:
+        body = await request.json()
+        user_id = body.get('user_id')
+        conversation_id = body.get('conversation_id')
+        transcript = body.get('transcript', [])
+
+        if not user_id:
+            raise HTTPException(
+                status_code=400,
+                detail="user_id is required"
+            )
+
+        logger.info(f"==== Generating TODO suggestions for user {user_id}")
+
+        result = await generate_todo_suggestions(user_id, conversation_id, transcript)
+
+        return JSONResponse(
+            status_code=200,
+            content={
+                "status": "success",
+                **result
+            }
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"==== Error generating TODO suggestions: {e}", exc_info=True)
         raise HTTPException(
             status_code=500,
             detail=f"Internal server error: {str(e)}"

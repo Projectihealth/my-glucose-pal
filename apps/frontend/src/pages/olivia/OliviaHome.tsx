@@ -1,9 +1,9 @@
 import { useNavigate } from 'react-router-dom';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Mic, Video, MessageCircle, Sparkles } from 'lucide-react';
-import { getConversationHistory } from '../../services/conversationsApi';
 import { processConversations } from '../../utils/conversationHelpers';
 import { getStoredUserId, USER_ID_CHANGE_EVENT } from '@/utils/userUtils';
+import { useConversationHistory, usePrefetchConversationDetail } from '../../hooks/useConversations';
 
 function OliviaHome() {
   const navigate = useNavigate();
@@ -31,31 +31,19 @@ interface ProcessedConversation {
 function OliviaTab({ onNavigate }: { onNavigate: (view: 'voice' | 'video' | 'text') => void }) {
   const [showChatModal, setShowChatModal] = useState(false);
   const [showAllHistory, setShowAllHistory] = useState(false);
-  const [conversationHistory, setConversationHistory] = useState<ProcessedConversation[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
   const [activeUserId, setActiveUserId] = useState(() => getStoredUserId());
+  
+  // Use React Query hook for conversation history (with caching)
+  const { data, isLoading, error } = useConversationHistory(activeUserId, 10);
+  const prefetchDetail = usePrefetchConversationDetail();
 
-  // Fetch conversation history
-  useEffect(() => {
-    const fetchHistory = async () => {
-      try {
-        setIsLoading(true);
-        const userId = getStoredUserId();
-        setActiveUserId(userId);
-        const { conversations } = await getConversationHistory(userId, 10);
-        const processed = processConversations(conversations);
-        setConversationHistory(processed);
-      } catch (error) {
-        console.error('Failed to fetch conversation history:', error);
-        setConversationHistory([]);
-      } finally {
-        setIsLoading(false);
-      }
-    };
+  // Process conversations data
+  const conversationHistory = useMemo(() => {
+    if (!data?.conversations) return [];
+    return processConversations(data.conversations);
+  }, [data]);
 
-    fetchHistory();
-  }, [activeUserId]);
-
+  // Listen for user changes
   useEffect(() => {
     const handleUserChange = () => {
       setActiveUserId(getStoredUserId());
@@ -165,6 +153,7 @@ function OliviaTab({ onNavigate }: { onNavigate: (view: 'voice' | 'video' | 'tex
                   key={conversation.id}
                   conversation={conversation}
                   onNavigate={onNavigate}
+                  onPrefetch={prefetchDetail}
                 />
               ))}
             </div>
@@ -243,9 +232,11 @@ function OliviaTab({ onNavigate }: { onNavigate: (view: 'voice' | 'video' | 'tex
 function ConversationCard({
   conversation,
   onNavigate,
+  onPrefetch,
 }: {
   conversation: ProcessedConversation;
   onNavigate: (view: 'voice' | 'video' | 'text') => void;
+  onPrefetch?: (conversationId: string) => void;
 }) {
   const navigate = useNavigate();
 
@@ -254,9 +245,17 @@ function ConversationCard({
     navigate(`/coach/conversation/${conversation.id}`);
   };
 
+  const handleMouseEnter = () => {
+    // Prefetch conversation detail on hover
+    if (onPrefetch) {
+      onPrefetch(conversation.id);
+    }
+  };
+
   return (
     <button
       onClick={handleClick}
+      onMouseEnter={handleMouseEnter}
       className="w-full group opacity-0 animate-fade-in"
       style={{
         animation: 'fadeIn 0.5s ease-out forwards',

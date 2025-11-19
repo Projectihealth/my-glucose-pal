@@ -84,16 +84,23 @@ class MemoryService:
         try:
             # 1. 提取短期记忆
             memory_result = self._extract_session_memory(transcript, channel)
-            
+
             # 2. 提取长期记忆更新
             long_term_updates = self._extract_long_term_updates(transcript, user_id)
-            
-            # 3. 提取 TODO
-            todos = self._extract_todos(transcript, user_name)
-            
+
+            # 3. 提取 TODO - DISABLED: TODOs are now generated on-demand in CallResultsPage
+            # todos = self._extract_todos(transcript, user_name)
+            todos = []  # Empty list since we're not auto-extracting TODOs anymore
+
             # 4. 保存到数据库
             memory_id = None
             if memory_result.get('summary'):
+                # Merge optional title into extracted_data for later use in dashboards
+                extracted_data = memory_result.get('extracted_data') or {}
+                title = memory_result.get('title')
+                if title:
+                    # Store under a stable key so frontend can read it
+                    extracted_data.setdefault('session_title', title)
                 memory_id = self.memory_repo.save_memory(
                     user_id=user_id,
                     conversation_id=conversation_id,
@@ -101,7 +108,7 @@ class MemoryService:
                     summary=memory_result['summary'],
                     insights=memory_result.get('insights'),
                     key_topics=memory_result.get('key_topics', []),
-                    extracted_data=memory_result.get('extracted_data', {})
+                    extracted_data=extracted_data
                 )
             
             # 5. 更新长期记忆
@@ -178,21 +185,33 @@ Conversation transcript:
 
 Please return the following content in JSON format:
 {{
-  "summary": "A complete summary of this conversation written in second person (You and Olivia). Requirements:
-              1. MUST use second person perspective: 'You and Olivia discussed...', 'You mentioned...', 'Olivia suggested...', 'You expressed...', 'You plan to...', etc.
-              2. NEVER use third person: avoid 'The user', 'The assistant', etc.
-              3. Adaptively adjust length based on conversation richness (no fixed sentence limit)
-              4. Must include: main topics discussed, your questions/concerns, specific recommendations from Olivia (including specific options, foods, timing, etc.), consensus or action plans you reached together
-              5. If the conversation involves multiple specific option choices, list key information for each option
-              6. Short conversations (< 5 exchanges) can be brief, long conversations (> 15 exchanges) can be detailed, aim for completeness
+  "title": "A short, concise English title (3-7 words) for this conversation, in Title Case, no quotes, no emojis, no ending punctuation. It should capture the main health topic or goal discussed. Examples: 'Nutrition Habits', 'Sleep Routine Check-in', 'Breakfast Planning', 'Stress Management Support'.",
+  "summary": "A structured bullet-point summary in second person perspective (You and Olivia). Format as a clean bulleted list following these requirements:
               
-              Examples of correct tone:
-              ✅ 'You and Olivia discussed managing nighttime hunger...'
-              ✅ 'You shared that you tried eating yogurt at night...'
-              ✅ 'Olivia suggested small portions of yogurt...'
-              ✅ 'Together, you established a recovery plan...'
-              ❌ 'The user discussed managing nighttime hunger...'
-              ❌ 'The assistant suggested...'",
+              FORMAT RULES:
+              - Use bullet points (•) to separate key points
+              - Each bullet point should be 1-2 sentences maximum
+              - Keep bullets concise and scannable
+              - Use line breaks between bullets
+              - Limit to 3-5 main bullet points total
+              
+              CONTENT RULES:
+              1. MUST use second person: 'You mentioned...', 'Olivia suggested...', 'You plan to...', 'Together you decided...'
+              2. NEVER use third person: avoid 'The user', 'The assistant'
+              3. First bullet: What you discussed/your main concern
+              4. Middle bullets: Key recommendations or insights Olivia provided (with specific details)
+              5. Last bullet: Action plan or next steps you agreed on
+              
+              EXAMPLE FORMAT:
+              • You shared that you've been experiencing nighttime hunger and asked Olivia for advice on healthy snack options.
+              • Olivia recommended Greek yogurt with nuts or a small portion of hummus with vegetables, explaining these provide protein and healthy fats to keep you satisfied.
+              • You decided to try having a small yogurt snack (150g) around 9 PM, about 2 hours before bedtime.
+              
+              DO NOT:
+              ❌ Write long paragraphs
+              ❌ Use numbered lists (1, 2, 3)
+              ❌ Use third person voice
+              ❌ Include more than 5 bullet points",
   
   "insights": "Insights, patterns, or trends discovered from the conversation (e.g., user's behavioral habits, emotional state, root causes of health issues)",
   
@@ -237,6 +256,18 @@ Return only JSON, no other text."""
             )
             
             result = json.loads(response.choices[0].message.content)
+            # Ensure we always return a dict with expected keys
+            if not isinstance(result, dict):
+                return {
+                    'summary': 'Failed to summarize conversation',
+                    'insights': None,
+                    'key_topics': [],
+                    'extracted_data': {}
+                }
+            result.setdefault('summary', '')
+            result.setdefault('insights', None)
+            result.setdefault('key_topics', [])
+            result.setdefault('extracted_data', {})
             return result
             
         except Exception as e:
@@ -484,15 +515,15 @@ Example 3 (Sleep):
             return transcript
         
         if isinstance(transcript, list):
-            # List[Dict] 格式 (GPT chat / Tavus video)
+            # List[Dict] format (GPT chat / Tavus video)
             lines = []
             for msg in transcript:
                 role = msg.get('role', 'unknown')
                 content = msg.get('content', '')
                 if role == 'user':
-                    lines.append(f"用户: {content}")
+                    lines.append(f"User: {content}")
                 elif role == 'assistant':
-                    lines.append(f"助手: {content}")
+                    lines.append(f"Olivia: {content}")
                 else:
                     lines.append(f"{role}: {content}")
             return '\n'.join(lines)

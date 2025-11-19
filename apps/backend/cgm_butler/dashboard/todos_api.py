@@ -282,3 +282,95 @@ def reset_daily_completion(user_id: str):
             })
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+
+
+@todos_bp.route('/batch-create', methods=['POST'])
+def batch_create_todos():
+    """
+    Batch create multiple todos (用于 CallResultsPage 保存用户选择的 TODOs)
+
+    Request Body (JSON):
+        {
+            "user_id": "user_001",
+            "conversation_id": "conv_xxx",
+            "week_start": "2025-01-13",
+            "todos": [
+                {
+                    "title": "...",
+                    "category": "diet",
+                    "health_benefit": "...",
+                    "time_of_day": "09:00-10:00",
+                    "time_description": "Before work",
+                    "target_count": 7,
+                    "priority": "high",
+                    "recommendation_tag": "ai_recommended"
+                }
+            ]
+        }
+
+    Returns:
+        JSON: Created todos with IDs
+    """
+    data = request.get_json()
+
+    if not data:
+        return jsonify({'error': 'Request body is required'}), 400
+
+    user_id = data.get('user_id')
+    todos_data = data.get('todos', [])
+    conversation_id = data.get('conversation_id')
+    week_start = data.get('week_start')
+
+    if not user_id:
+        return jsonify({'error': 'user_id is required'}), 400
+
+    if not todos_data:
+        return jsonify({'error': 'todos array is required'}), 400
+
+    try:
+        with get_connection() as conn:
+            todo_repo = TodoRepository(conn)
+            created_todos = []
+
+            for todo_data in todos_data:
+                title = todo_data.get('title')
+                if not title:
+                    continue  # Skip todos without title
+
+                # Build optional fields
+                optional_fields = {
+                    'conversation_id': conversation_id,
+                    'description': todo_data.get('description'),
+                    'category': todo_data.get('category'),
+                    'health_benefit': todo_data.get('health_benefit'),
+                    'time_of_day': todo_data.get('time_of_day'),
+                    'time_description': todo_data.get('time_description'),
+                    'target_count': todo_data.get('target_count', 1),
+                    'current_count': todo_data.get('current_count', 0),
+                    'status': todo_data.get('status', 'pending'),
+                    'user_selected': 1 if todo_data.get('user_selected', True) else 0,  # Convert to int for database
+                    'priority': todo_data.get('priority'),
+                    'recommendation_tag': todo_data.get('recommendation_tag'),
+                    'week_start': week_start,
+                }
+
+                # Remove None values
+                optional_fields = {k: v for k, v in optional_fields.items() if v is not None}
+
+                # Create todo
+                todo_id = todo_repo.create(user_id, title, **optional_fields)
+
+                # Get created todo
+                todo = todo_repo.get_by_id(todo_id)
+                created_todos.append(todo)
+
+            conn.commit()
+
+            return jsonify({
+                'message': f'Created {len(created_todos)} todos',
+                'count': len(created_todos),
+                'todos': created_todos
+            }), 201
+
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500

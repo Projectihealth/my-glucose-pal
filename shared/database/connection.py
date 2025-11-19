@@ -2,17 +2,45 @@
 Database Connection Management
 
 Provides centralized database connection handling for all services.
+Supports both SQLite and MySQL databases.
+
+⚠️ IMPORTANT: Database Type Selection
+- The active database type is controlled by DB_TYPE in .env file
+- DB_TYPE=sqlite: Uses SQLite (storage/databases/cgm_butler.db)
+- DB_TYPE=mysql: Uses MySQL (connection details from .env)
+
+🔧 Usage:
+- ALWAYS use get_connection() or get_db_session() for database access
+- DO NOT directly access SQLite files when DB_TYPE=mysql
+- The get_db_path() function is ONLY for SQLite mode
 """
 
 import sqlite3
 import os
-from typing import Optional
+import sys
+from typing import Optional, Union
 from contextlib import contextmanager
+
+# 添加项目根目录到路径
+project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+if project_root not in sys.path:
+    sys.path.insert(0, project_root)
+
+try:
+    import pymysql
+    MYSQL_AVAILABLE = True
+except ImportError:
+    MYSQL_AVAILABLE = False
+    pymysql = None
 
 
 def get_db_path(db_name: str = 'cgm_butler.db') -> str:
     """
     Get the database file path.
+    
+    ⚠️ WARNING: This function is ONLY for SQLite mode.
+    If DB_TYPE=mysql in .env, this function should NOT be used.
+    Use get_connection() instead, which handles both SQLite and MySQL.
     
     Priority:
     1. Environment variable: CGM_DB_PATH
@@ -45,32 +73,44 @@ def get_db_path(db_name: str = 'cgm_butler.db') -> str:
     return storage_path
 
 
-def get_connection(db_path: Optional[str] = None) -> sqlite3.Connection:
+def get_connection(db_path: Optional[str] = None) -> Union[sqlite3.Connection, 'pymysql.connections.Connection']:
     """
-    Get a database connection.
+    Get a database connection (SQLite or MySQL based on config).
     
     Args:
-        db_path: Optional custom database path
+        db_path: Optional custom database path (SQLite only)
         
     Returns:
-        SQLite connection with row_factory set
+        Database connection (SQLite or MySQL)
     """
-    if db_path is None:
-        db_path = get_db_path()
+    from config.settings import settings
     
-    conn = sqlite3.connect(db_path)
-    conn.row_factory = sqlite3.Row
+    db_type = settings.DB_TYPE.lower()
     
-    # Enable foreign keys
-    conn.execute("PRAGMA foreign_keys = ON")
+    if db_type == 'mysql':
+        if not MYSQL_AVAILABLE:
+            raise ImportError("PyMySQL not installed. Install with: pip install pymysql")
+        
+        from shared.database.mysql_connection import MySQLConnection
+        return MySQLConnection.get_connection()
     
-    return conn
+    else:  # Default to SQLite
+        if db_path is None:
+            db_path = get_db_path()
+        
+        conn = sqlite3.connect(db_path)
+        conn.row_factory = sqlite3.Row
+        
+        # Enable foreign keys
+        conn.execute("PRAGMA foreign_keys = ON")
+        
+        return conn
 
 
 @contextmanager
 def get_db_session(db_path: Optional[str] = None):
     """
-    Context manager for database sessions.
+    Context manager for database sessions (SQLite or MySQL).
     
     Usage:
         with get_db_session() as conn:
@@ -79,40 +119,70 @@ def get_db_session(db_path: Optional[str] = None):
             conn.commit()
     
     Args:
-        db_path: Optional custom database path
+        db_path: Optional custom database path (SQLite only)
         
     Yields:
-        SQLite connection
+        Database connection (SQLite or MySQL)
     """
-    conn = get_connection(db_path)
-    try:
-        yield conn
-        conn.commit()
-    except Exception:
-        conn.rollback()
-        raise
-    finally:
-        conn.close()
+    from config.settings import settings
+    
+    db_type = settings.DB_TYPE.lower()
+    
+    if db_type == 'mysql':
+        if not MYSQL_AVAILABLE:
+            raise ImportError("PyMySQL not installed. Install with: pip install pymysql")
+        
+        from shared.database.mysql_connection import MySQLConnection
+        with MySQLConnection.get_db_session() as conn:
+            yield conn
+    else:
+        conn = get_connection(db_path)
+        try:
+            yield conn
+            conn.commit()
+        except Exception:
+            conn.rollback()
+            raise
+        finally:
+            conn.close()
 
 
 def init_database(db_path: Optional[str] = None) -> None:
     """
-    Initialize database with all tables.
+    Initialize database with all tables (SQLite or MySQL).
     
     Args:
-        db_path: Optional custom database path
+        db_path: Optional custom database path (SQLite only)
     """
-    from .schema import create_all_tables
+    from config.settings import settings
     
-    if db_path is None:
-        db_path = get_db_path()
+    db_type = settings.DB_TYPE.lower()
     
-    conn = get_connection(db_path)
-    try:
-        create_all_tables(conn)
-        print(f"✅ Database initialized: {db_path}")
-    finally:
-        conn.close()
+    if db_type == 'mysql':
+        if not MYSQL_AVAILABLE:
+            raise ImportError("PyMySQL not installed. Install with: pip install pymysql")
+        
+        from shared.database.mysql_schema import create_all_tables
+        from shared.database.mysql_connection import MySQLConnection
+        
+        conn = MySQLConnection.get_connection()
+        try:
+            create_all_tables(conn)
+            print(f"✅ MySQL数据库初始化成功: {settings.MYSQL_HOST}:{settings.MYSQL_PORT}/{settings.MYSQL_DATABASE}")
+        finally:
+            conn.close()
+    else:
+        from .schema import create_all_tables
+        
+        if db_path is None:
+            db_path = get_db_path()
+        
+        conn = get_connection(db_path)
+        try:
+            create_all_tables(conn)
+            print(f"✅ SQLite数据库初始化成功: {db_path}")
+        finally:
+            conn.close()
 
 
 if __name__ == '__main__':

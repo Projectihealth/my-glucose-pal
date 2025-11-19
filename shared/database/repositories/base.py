@@ -2,61 +2,101 @@
 Base Repository Class
 
 Provides common database operations for all repositories.
+Supports both SQLite and MySQL.
 """
 
 import sqlite3
 from typing import Optional, List, Dict, Any
 
+try:
+    import pymysql
+    MYSQL_AVAILABLE = True
+except ImportError:
+    pymysql = None
+    MYSQL_AVAILABLE = False
+
 
 class BaseRepository:
     """Base class for all repositories."""
     
-    def __init__(self, conn: sqlite3.Connection):
+    def __init__(self, conn):
         """
         Initialize repository with database connection.
         
         Args:
-            conn: SQLite connection
+            conn: Database connection (SQLite or MySQL)
         """
         self.conn = conn
         self.cursor = conn.cursor()
+        
+        # 检测数据库类型
+        if MYSQL_AVAILABLE and isinstance(conn, pymysql.connections.Connection):
+            self.db_type = 'mysql'
+            self.placeholder = '%s'
+        else:
+            self.db_type = 'sqlite'
+            self.placeholder = '?'
     
-    def _dict_from_row(self, row: sqlite3.Row) -> Dict[str, Any]:
+    def _dict_from_row(self, row) -> Dict[str, Any]:
         """
-        Convert sqlite3.Row to dictionary.
+        Convert row to dictionary.
         
         Args:
-            row: SQLite row object
+            row: Row object (SQLite Row or MySQL dict)
             
         Returns:
             Dictionary representation
         """
-        return dict(row) if row else {}
+        if row is None:
+            return {}
+        if isinstance(row, dict):
+            return row  # MySQL already returns dict
+        return dict(row)  # SQLite Row
     
-    def _dicts_from_rows(self, rows: List[sqlite3.Row]) -> List[Dict[str, Any]]:
+    def _dicts_from_rows(self, rows) -> List[Dict[str, Any]]:
         """
-        Convert list of sqlite3.Row to list of dictionaries.
+        Convert list of rows to list of dictionaries.
         
         Args:
-            rows: List of SQLite row objects
+            rows: List of row objects
             
         Returns:
             List of dictionaries
         """
-        return [dict(row) for row in rows]
+        if not rows:
+            return []
+        if rows and isinstance(rows[0], dict):
+            return rows  # MySQL already returns dicts
+        return [dict(row) for row in rows]  # SQLite Rows
     
-    def execute(self, query: str, params: tuple = ()) -> sqlite3.Cursor:
+    def _convert_query(self, query: str) -> str:
+        """
+        Convert SQLite query to MySQL if needed.
+        
+        Args:
+            query: SQL query with ? placeholders
+            
+        Returns:
+            Query with appropriate placeholders
+        """
+        if self.db_type == 'mysql':
+            # 替换 ? 为 %s
+            return query.replace('?', '%s')
+        return query
+    
+    def execute(self, query: str, params: tuple = ()):
         """
         Execute a query.
         
         Args:
-            query: SQL query
+            query: SQL query (can use ? placeholders, will be converted)
             params: Query parameters
             
         Returns:
             Cursor object
         """
-        return self.cursor.execute(query, params)
+        converted_query = self._convert_query(query)
+        return self.cursor.execute(converted_query, params)
     
     def fetchone(self, query: str, params: tuple = ()) -> Optional[Dict[str, Any]]:
         """

@@ -11,6 +11,10 @@ requests>=2.26.0           # HTTP Client for Tavus API
 openai>=1.0.0              # GPT-4o Chat Integration
 python-dotenv>=0.19.0      # Load environment variables from .env files
 
+# 数据库
+pymysql>=1.1.0             # MySQL Database Driver
+cryptography>=41.0.0       # For MySQL SSL support
+
 # 内置库 (无需安装)
 # - sqlite3
 # - datetime

@@ -647,44 +647,192 @@ def get_conversation_history(user_id):
         with get_connection() as conn:
             cursor = conn.cursor()
 
-            # Query to get conversations with their summaries from user_memories
-            query = '''
-            SELECT
-                c.conversation_id,
-                c.conversation_type,
-                c.started_at,
-                c.ended_at,
-                c.duration_seconds,
-                c.transcript,
-                m.summary,
-                m.key_topics,
-                m.insights,
-                m.extracted_data
-            FROM conversations c
-            LEFT JOIN user_memories m ON c.conversation_id = m.conversation_id
-            WHERE c.user_id = ?
-                AND c.status IN ('completed', 'ended')
-                AND m.summary IS NOT NULL
-            ORDER BY c.started_at DESC
-            LIMIT ?
-            '''
-
-            cursor.execute(query, (user_id, limit))
-            rows = cursor.fetchall()
-
+            # 使用 ConversationRepository 而不是原始SQL
+            from shared.database.repositories.conversation_repository import ConversationRepository
+            conv_repo = ConversationRepository(conn)
+            
+            # 获取用户的对话列表（包含 summary）
+            conversations_data = conv_repo.get_user_conversations(user_id, limit=limit)
+            
+            # ⚡ 性能优化：一次性获取所有对话的memories，避免N+1查询问题
+            conversation_ids = [conv['conversation_id'] for conv in conversations_data]
+            memory_map = {}
+            
+            if conversation_ids:
+                try:
+                    from shared.database.repositories.memory_repository import MemoryRepository
+                    mem_repo = MemoryRepository(conn)
+                    
+                    # 一次性查询所有相关的memories
+                    placeholders = ', '.join([mem_repo.placeholder] * len(conversation_ids))
+                    query = f'''
+                        SELECT * FROM user_memories 
+                        WHERE conversation_id IN ({placeholders})
+                    '''
+                    mem_repo.execute(query, tuple(conversation_ids))
+                    memories = mem_repo.cursor.fetchall()
+                    
+                    # 构建conversation_id -> memory的映射
+                    for mem in memories:
+                        mem_dict = mem_repo._dict_from_row(mem)
+                        conv_id = mem_dict.get('conversation_id')
+                        if conv_id:
+                            memory_map[conv_id] = mem_dict
+                except Exception as e:
+                    print(f"Warning: Failed to get memories: {e}")
+            
             conversations = []
-            for row in rows:
+            for conv in conversations_data:
+                # 从映射中直接获取memory（O(1)查找）
+                memory = memory_map.get(conv['conversation_id'])
+
+                # -------------------------
+                # 对话有效性过滤（避免展示“空内容”卡片）
+                # -------------------------
+                conv_id = conv.get('conversation_id') or ''
+                started_at = conv.get('started_at')
+                raw_transcript = conv.get('transcript') or ''
+                raw_summary = ''
+                if memory:
+                    raw_summary = memory.get('summary') or ''
+
+                # 跳过测试对话（脚本生成的 test_xxx）
+                if conv_id.startswith('test_'):
+                    continue
+
+                # 将 transcript / summary 简单标准化
+                def _normalize_text(text) -> str:
+                    if not text:
+                        return ''
+                    if isinstance(text, (dict, list)):
+                        try:
+                            return json.dumps(text, ensure_ascii=False)
+                        except Exception:
+                            return str(text)
+                    return str(text)
+
+                summary_text = _normalize_text(raw_summary).strip()
+
+                # 规则：只展示有“可读 summary”的对话
+                # - summary 至少需要一定长度（避免只有一句客套、或解析失败的情况）
+                # - 没有 summary 的历史测试对话 / 误触通话将被过滤掉
+                MIN_SUMMARY_LEN = 40  # 大约一两句话
+
+                if len(summary_text) < MIN_SUMMARY_LEN:
+                    # 没有有效 summary，则不在历史卡片中展示
+                    continue
+
+                # 处理JSON字段（MySQL可能已解析，SQLite返回字符串）
+                def parse_json_field(field_value, default):
+                    if not field_value:
+                        return default
+                    if isinstance(field_value, (dict, list)):
+                        return field_value  # MySQL已解析
+                    if isinstance(field_value, str):
+                        try:
+                            return json.loads(field_value)  # SQLite字符串
+                        except:
+                            return default
+                    return default
+                
+                # 生成简洁的对话标题 (英文)
+                def generate_conversation_title(conv_type, summary, key_topics, started_at, conversation_name=None):
+                    from datetime import datetime
+                    
+                    # 如果有conversation_name，且不是默认的"Voice Call - call_xxx"格式，就用它
+                    if conversation_name and not (conversation_name.startswith('Voice Call - call_') or 
+                                                  conversation_name.startswith('Video Call - call_')):
+                        return conversation_name
+                    
+                    # 根据对话类型 (英文)
+                    type_prefix = {
+                        'retell_voice': 'Voice Chat',
+                        'tavus_video': 'Video Chat', 
+                        'gpt_chat': 'Text Chat'
+                    }.get(conv_type, 'Conversation')
+                    
+                    # Extract topic from English summary
+                    if summary:
+                        # Skip brief greeting conversations
+                        skip_keywords = ['brief interaction', 'no specific topics', 'whenever you', 'available to chat']
+                        if not any(keyword in summary.lower() for keyword in skip_keywords):
+                            
+                            # Find specific health topics in English summary
+                            health_topics_map = {
+                                'blood sugar': 'Blood Sugar',
+                                'glucose level': 'Glucose',
+                                'meal planning': 'Meal Planning',
+                                'meal': 'Meal Discussion',
+                                'exercise': 'Exercise',
+                                'health goal': 'Health Goals',
+                                'diet': 'Diet Planning',
+                                'medication': 'Medication',
+                                'insulin': 'Insulin',
+                                'stress': 'Stress Management',
+                                'sleep': 'Sleep Quality',
+                                'weight': 'Weight Management',
+                                'nutrition': 'Nutrition'
+                            }
+                            
+                            summary_lower = summary.lower()
+                            for en_keyword, topic_title in health_topics_map.items():
+                                if en_keyword in summary_lower:
+                                    return f"{type_prefix} - {topic_title}"
+                            
+                            # Extract topic from "discussed X" pattern
+                            if 'discussed' in summary_lower:
+                                idx = summary_lower.find('discussed')
+                                after = summary[idx + 9:].strip()
+                                if after:
+                                    topic = after.split('.')[0].split(',')[0].strip()
+                                    if 5 < len(topic) < 35 and not topic.startswith(('how', 'whether', 'if', 'your', 'the')):
+                                        # Capitalize first letter
+                                        topic = topic[0].upper() + topic[1:] if topic else topic
+                                        return f"{type_prefix} - {topic}"
+                            
+                            # Extract topic from "created a plan" pattern
+                            if 'created a plan' in summary_lower:
+                                return f"{type_prefix} - Health Plan"
+                    
+                    # Use key_topics
+                    topics = parse_json_field(key_topics, [])
+                    if topics and len(topics) > 0:
+                        return f"{type_prefix} - {topics[0]}"
+                    
+                    # Use date and time (English format)
+                    if started_at:
+                        try:
+                            if isinstance(started_at, str):
+                                dt = datetime.fromisoformat(str(started_at).replace('Z', '+00:00').replace('GMT', '+00:00'))
+                            else:
+                                dt = started_at
+                            date_str = dt.strftime('%b %d, %H:%M')  # e.g., "Nov 18, 00:48"
+                            return f"{type_prefix} ({date_str})"
+                        except:
+                            pass
+                    
+                    return type_prefix
+                
+                title = generate_conversation_title(
+                    conv['conversation_type'],
+                    summary_text,
+                    memory.get('key_topics') if memory else None,
+                    conv.get('started_at'),
+                    conv.get('conversation_name')
+                )
+                
                 conversation = {
-                    'id': row[0],
-                    'type': row[1],
-                    'started_at': row[2],
-                    'ended_at': row[3],
-                    'duration_seconds': row[4],
-                    'transcript': row[5],
-                    'summary': row[6],
-                    'key_topics': json.loads(row[7]) if row[7] else [],
-                    'insights': row[8],
-                    'extracted_data': json.loads(row[9]) if row[9] else {}
+                    'id': conv['conversation_id'],
+                    'type': conv['conversation_type'],
+                    'title': title,  # 添加简洁标题
+                    'started_at': str(conv.get('started_at', '')),
+                    'ended_at': str(conv.get('ended_at', '')),
+                    'duration_seconds': conv.get('duration_seconds'),
+                    'transcript': raw_transcript,
+                    'summary': summary_text,
+                    'key_topics': parse_json_field(memory.get('key_topics') if memory else None, []),
+                    'insights': memory.get('insights', '') if memory else '',
+                    'extracted_data': parse_json_field(memory.get('extracted_data') if memory else None, {})
                 }
                 conversations.append(conversation)
 
@@ -705,46 +853,60 @@ def get_conversation_detail(conversation_id):
     """
     try:
         with get_connection() as conn:
-            cursor = conn.cursor()
+            # 使用 Repository 而不是原始SQL
+            from shared.database.repositories.conversation_repository import ConversationRepository
+            from shared.database.repositories.memory_repository import MemoryRepository
+            
+            conv_repo = ConversationRepository(conn)
+            mem_repo = MemoryRepository(conn)
+            
+            # 获取对话信息
+            conversation = conv_repo.get_by_id(conversation_id)
 
-            # Query conversation details
-            query = '''
-            SELECT
-                c.*,
-                m.summary,
-                m.key_topics,
-                m.insights,
-                m.extracted_data
-            FROM conversations c
-            LEFT JOIN user_memories m ON c.conversation_id = m.conversation_id
-            WHERE c.conversation_id = ?
-            '''
-
-            cursor.execute(query, (conversation_id,))
-            row = cursor.fetchone()
-
-            if not row:
+            if not conversation:
                 return jsonify({'error': 'Conversation not found'}), 404
 
-            # Get column names
-            columns = [description[0] for description in cursor.description]
-            conversation = dict(zip(columns, row))
-
-            # Parse JSON fields
-            if conversation.get('key_topics'):
-                conversation['key_topics'] = json.loads(conversation['key_topics'])
-            if conversation.get('extracted_data'):
-                conversation['extracted_data'] = json.loads(conversation['extracted_data'])
-            if conversation.get('transcript'):
-                try:
-                    conversation['transcript'] = json.loads(conversation['transcript'])
-                except:
-                    pass  # Keep as string if not JSON
+            # 获取对应的memory
+            user_id = conversation.get('user_id')
+            memories = mem_repo.get_recent_memories(user_id, days=365, limit=100)
+            
+            memory = None
+            for m in memories:
+                if m.get('conversation_id') == conversation_id:
+                    memory = m
+                    break
+            
+            # 合并memory信息到conversation
+            if memory:
+                # 处理JSON字段（兼容MySQL和SQLite）
+                def parse_json_field(field_value, default):
+                    if not field_value:
+                        return default
+                    if isinstance(field_value, (dict, list)):
+                        return field_value
+                    if isinstance(field_value, str):
+                        try:
+                            return json.loads(field_value)
+                        except:
+                            return default
+                    return default
+                
+                conversation['summary'] = memory.get('summary', '')
+                conversation['key_topics'] = parse_json_field(memory.get('key_topics'), [])
+                conversation['insights'] = memory.get('insights', '')
+                conversation['extracted_data'] = parse_json_field(memory.get('extracted_data'), {})
+            else:
+                conversation['summary'] = ''
+                conversation['key_topics'] = []
+                conversation['insights'] = ''
+                conversation['extracted_data'] = {}
 
             return jsonify({'conversation': conversation})
 
     except Exception as e:
         print(f"Error fetching conversation detail: {e}")
+        import traceback
+        traceback.print_exc()
         return jsonify({'error': str(e)}), 500
 
 

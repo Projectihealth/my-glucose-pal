@@ -79,15 +79,19 @@ class TodoRepository(BaseRepository):
         # Parse uploaded_images if provided as list
         uploaded_images = kwargs.get('uploaded_images', [])
         if isinstance(uploaded_images, list):
+            # Serialize for both SQLite and MySQL
             uploaded_images = json.dumps(uploaded_images)
+        elif uploaded_images is None:
+            uploaded_images = '[]'  # Empty JSON array as string
 
         self.execute('''
         INSERT INTO user_todos (
             user_id, conversation_id, title, description, category,
             health_benefit, time_of_day, time_description,
             target_count, current_count, status, completed_today,
+            user_selected, priority, recommendation_tag,
             uploaded_images, notes, week_start, created_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ''', (
             user_id,
             kwargs.get('conversation_id'),
@@ -101,6 +105,9 @@ class TodoRepository(BaseRepository):
             kwargs.get('current_count', 0),
             kwargs.get('status', 'pending'),
             kwargs.get('completed_today', 0),
+            kwargs.get('user_selected', 1),  # Default to True/1
+            kwargs.get('priority'),
+            kwargs.get('recommendation_tag'),
             uploaded_images,
             kwargs.get('notes'),
             kwargs.get('week_start'),
@@ -127,12 +134,23 @@ class TodoRepository(BaseRepository):
         # Handle uploaded_images serialization
         if 'uploaded_images' in kwargs:
             if isinstance(kwargs['uploaded_images'], list):
-                kwargs['uploaded_images'] = json.dumps(kwargs['uploaded_images'])
+                # Only serialize for SQLite; MySQL JSON type handles lists automatically
+                if self.db_type == 'sqlite':
+                    kwargs['uploaded_images'] = json.dumps(kwargs['uploaded_images'])
+                # For MySQL, keep as list
+
+        # Normalise uploaded_images for UPDATE as well
+        if 'uploaded_images' in kwargs:
+            ui = kwargs['uploaded_images']
+            if isinstance(ui, list):
+                # Always store as JSON string; works for both SQLite (TEXT) and MySQL (JSON)
+                kwargs['uploaded_images'] = json.dumps(ui)
 
         for field in [
             'title', 'description', 'category', 'health_benefit',
             'time_of_day', 'time_description', 'target_count',
             'current_count', 'status', 'completed_today',
+            'user_selected', 'priority', 'recommendation_tag',
             'uploaded_images', 'notes', 'week_start', 'completed_at'
         ]:
             if field in kwargs:
@@ -200,17 +218,28 @@ class TodoRepository(BaseRepository):
             status = 'pending'
             completed_at = None
 
-        # Handle images
-        existing_images = todo.get('uploaded_images', [])
-        if images:
-            existing_images.extend(images)
+        # NOTE:
+        #   Previously we tried to always update `uploaded_images` here by
+        #   reading the existing JSON/list value and writing it back.
+        #   This caused SQL syntax issues on MySQL because of how the JSON
+        #   column and parameter binding interacted (see error near
+        #   "uploaded_images = ), notes = ...").
+        #
+        #   For now, we keep `uploaded_images` immutable during check‑in
+        #   (we don't support attaching images from GoalTab yet), which
+        #   removes the problematic field from the UPDATE statement and
+        #   fixes the 500 errors on `/api/todos/<id>/check-in`.
+        #
+        #   If/when we want to support images here, we should implement
+        #   a dedicated JSON append/update helper that is tested on both
+        #   SQLite and MySQL.
 
-        # Update todo
+        # Base fields that always get updated on check‑in
         update_kwargs = {
-            'current_count': new_count,
+            # Prevent current_count from exceeding target_count
+            'current_count': min(new_count, target_count),
             'status': status,
             'completed_today': 1,
-            'uploaded_images': existing_images
         }
 
         if notes:
@@ -249,11 +278,16 @@ class TodoRepository(BaseRepository):
         Returns:
             Todo with parsed JSON fields
         """
-        if 'uploaded_images' in todo and todo['uploaded_images']:
-            try:
-                todo['uploaded_images'] = json.loads(todo['uploaded_images'])
-            except (json.JSONDecodeError, TypeError):
-                todo['uploaded_images'] = []
+        raw_images = todo.get('uploaded_images')
+        if raw_images:
+            # MySQL JSON column may already return list/dict; SQLite returns TEXT
+            if isinstance(raw_images, (list, dict)):
+                todo['uploaded_images'] = raw_images
+            else:
+                try:
+                    todo['uploaded_images'] = json.loads(raw_images)
+                except (json.JSONDecodeError, TypeError):
+                    todo['uploaded_images'] = []
         else:
             todo['uploaded_images'] = []
 

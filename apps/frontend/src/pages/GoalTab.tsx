@@ -11,7 +11,7 @@ import { Todo } from '@/services/todosApi';
 
 export function GoalTab() {
   // TODO: Get user_id from authentication context
-  const userId = 'user_001'; // Hardcoded for now
+  const userId = 'user_38377a3b'; // Hardcoded for now - should match your actual user ID
 
   const [todos, setTodos] = useState<Todo[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -50,11 +50,22 @@ export function GoalTab() {
     return monday.toISOString().split('T')[0];
   };
 
+  // 标准化日期格式：将后端返回的日期转换为 YYYY-MM-DD 格式
+  const normalizeDate = (dateString: string | null | undefined): string => {
+    if (!dateString) return '';
+    try {
+      const date = new Date(dateString);
+      return date.toISOString().split('T')[0];
+    } catch {
+      return dateString;
+    }
+  };
+
   const currentWeekStart = getCurrentWeekStart();
 
   // Get current week todos
   const currentWeekTodos = todos
-    .filter(t => !t.week_start || t.week_start === currentWeekStart)
+    .filter(t => !t.week_start || normalizeDate(t.week_start) === currentWeekStart)
     .sort((a, b) => {
       // Completed todos go to bottom
       const aCompleted = a.current_count >= a.target_count;
@@ -67,11 +78,11 @@ export function GoalTab() {
       return 0;
     });
 
-  const historicalTodos = todos.filter(t => t.week_start && t.week_start !== currentWeekStart);
+  const historicalTodos = todos.filter(t => t.week_start && normalizeDate(t.week_start) !== currentWeekStart);
 
   // Group historical todos by week
   const todosByWeek = historicalTodos.reduce((acc, todo) => {
-    const weekStart = todo.week_start || currentWeekStart;
+    const weekStart = normalizeDate(todo.week_start) || currentWeekStart;
     if (!acc[weekStart]) {
       acc[weekStart] = [];
     }
@@ -101,7 +112,9 @@ export function GoalTab() {
   const canGoForward = displayWeek ? historicalWeeks.indexOf(displayWeek) > 0 : false;
 
   const handleAddTodo = async (newTodo: { title: string; category: Todo['category']; health_benefit: string; target_count: number }) => {
+    console.log('handleAddTodo called with:', newTodo);
     try {
+      console.log('Calling API to create todo...');
       const createdTodo = await todosApi.createTodo({
         user_id: userId,
         title: newTodo.title,
@@ -112,11 +125,13 @@ export function GoalTab() {
         status: 'pending',
         week_start: currentWeekStart,
       });
+      console.log('Todo created successfully:', createdTodo);
       setTodos(prev => [...prev, createdTodo]);
-      setShowAddModal(false);
+      // Modal will be closed by AddTodoModal's handleSubmit
     } catch (err) {
       console.error('Failed to create todo:', err);
       alert('Failed to create habit. Please try again.');
+      throw err; // Re-throw to prevent modal from closing on error
     }
   };
 
@@ -146,7 +161,9 @@ export function GoalTab() {
   };
 
   const handleAddToCurrentWeek = async (todo: Todo) => {
+    console.log('handleAddToCurrentWeek called with todo:', todo);
     try {
+      console.log('Creating todo for current week:', currentWeekStart);
       const newTodo = await todosApi.createTodo({
         user_id: userId,
         title: todo.title,
@@ -157,10 +174,17 @@ export function GoalTab() {
         status: 'pending',
         week_start: currentWeekStart,
       });
+      console.log('Todo added to current week:', newTodo);
       setTodos(prev => [...prev, newTodo]);
+      
+      // 显示成功提示
+      alert(`✅ Added "${todo.title}" to this week!`);
+      
+      // 切换回当前周
+      setSelectedHistoryWeek(null);
     } catch (err) {
       console.error('Failed to add todo to current week:', err);
-      alert('Failed to add habit to current week. Please try again.');
+      alert('❌ Failed to add habit to current week. Please try again.');
     }
   };
 
@@ -911,8 +935,14 @@ interface CompactTodoCardProps {
 }
 
 function CompactTodoCard({ todo, onAddToCurrentWeek, getCategoryIcon, getCategoryColor }: CompactTodoCardProps) {
+  const [isHovered, setIsHovered] = useState(false);
+
   return (
-    <div className="bg-gray-50 rounded-2xl p-3 border border-gray-100">
+    <div
+      className="bg-gray-50 rounded-2xl p-3 border border-gray-100 group hover:border-[#5B7FF3]/30 transition-all cursor-pointer"
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
+    >
       <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-2 flex-1 min-w-0">
           <div className={`w-5 h-5 rounded-full ${getCategoryColor(todo.category)} flex items-center justify-center flex-shrink-0`}>
@@ -920,20 +950,37 @@ function CompactTodoCard({ todo, onAddToCurrentWeek, getCategoryIcon, getCategor
               {getCategoryIcon(todo.category)}
             </div>
           </div>
-          <p className="text-gray-700 text-sm truncate">{todo.title}</p>
+          <p className="text-gray-700 text-sm truncate group-hover:text-gray-900 transition-colors">
+            {todo.title}
+          </p>
         </div>
 
         <div className="flex items-center gap-2 flex-shrink-0">
+          {/* Progress counter - always visible */}
           <span className="text-xs text-gray-500">
             {todo.current_count}/{todo.target_count}
           </span>
-          <button
-            onClick={() => onAddToCurrentWeek(todo)}
-            className="px-3 py-1.5 rounded-full bg-[#5B7FF3] hover:bg-[#4A6FE3] text-white text-xs active:scale-95 transition-all flex items-center gap-1 z-10"
+
+          {/* Add button - appears on hover (desktop), always visible on mobile */}
+          <motion.button
+            initial={false}
+            animate={{
+              opacity: isHovered ? 1 : 0.6,
+              scale: isHovered ? 1 : 0.95,
+            }}
+            transition={{
+              duration: 0.2,
+              ease: 'easeOut'
+            }}
+            onClick={(e) => {
+              e.stopPropagation();
+              onAddToCurrentWeek(todo);
+            }}
+            className="px-3 py-1.5 rounded-full bg-[#5B7FF3] hover:bg-[#4A6FE3] text-white text-xs active:scale-95 transition-all flex items-center gap-1 z-10 sm:opacity-100"
           >
             <Plus className="w-3 h-3" />
-            Add
-          </button>
+            <span className="hidden sm:inline">Add</span>
+          </motion.button>
         </div>
       </div>
     </div>
@@ -951,16 +998,27 @@ function AddTodoModal({ onClose, onAdd }: AddTodoModalProps) {
   const [category, setCategory] = useState<Todo['category']>('diet');
   const [healthBenefit, setHealthBenefit] = useState('');
   const [targetCount, setTargetCount] = useState(7);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (title.trim()) {
-      onAdd({
+    if (title.trim() && !isSubmitting) {
+      setIsSubmitting(true);
+      try {
+        console.log('Submitting new habit:', { title, category, health_benefit: healthBenefit, target_count: targetCount });
+        await onAdd({
         title: title.trim(),
         category,
         health_benefit: healthBenefit.trim() || 'Improves overall health',
         target_count: targetCount,
       });
+        console.log('Habit created successfully!');
+        onClose(); // 只在成功时关闭modal
+      } catch (error) {
+        // 错误已经在handleAddTodo中处理，不关闭modal
+        console.error('Failed to add todo:', error);
+        setIsSubmitting(false);
+      }
     }
   };
 
@@ -1083,10 +1141,11 @@ function AddTodoModal({ onClose, onAdd }: AddTodoModalProps) {
           <div className="flex justify-center mt-6">
             <button
               type="submit"
-              className="px-8 py-3 bg-gradient-to-r from-[#5B7FF3] to-[#4A6FE3] text-white rounded-full hover:shadow-lg active:scale-95 transition-all"
+              disabled={isSubmitting}
+              className="px-8 py-3 bg-gradient-to-r from-[#5B7FF3] to-[#4A6FE3] text-white rounded-full hover:shadow-lg active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
               style={{ fontWeight: 600 }}
             >
-              Add
+              {isSubmitting ? 'Adding...' : 'Add'}
             </button>
           </div>
         </form>

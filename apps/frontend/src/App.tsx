@@ -22,6 +22,7 @@ import ConversationDetail from "./pages/olivia/ConversationDetail";
 import VoiceChat from "./pages/olivia/VoiceChat";
 import VideoChat from "./pages/olivia/VideoChat";
 import TextChat from "./pages/olivia/TextChat";
+import { CallResultsPage } from "./pages/olivia/CallResultsPage";
 import IconPreview from "./pages/IconPreview";
 import { useState, useEffect } from "react";
 
@@ -73,6 +74,7 @@ const App = () => (
                 <Route path="/coach/voice" element={<VoiceChat />} />
                 <Route path="/coach/video" element={<VideoChat />} />
                 <Route path="/coach/text" element={<TextChat />} />
+                <Route path="/olivia/call-results" element={<CallResultsPage />} />
                 <Route path="/icon-preview" element={<IconPreview />} />
               <Route path="/learn-more" element={<LearnMoreOrGoalTab />} />
               <Route path="/learn-more/olivia" element={<OliviaOverview />} />

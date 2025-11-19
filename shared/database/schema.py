@@ -229,6 +229,11 @@ CREATE TABLE IF NOT EXISTS user_todos (
     status VARCHAR(20) DEFAULT 'pending', -- 'pending', 'in_progress', 'completed', 'cancelled'
     completed_today INTEGER DEFAULT 0,   -- 今天是否已完成 (0 or 1)
 
+    -- 用户选择和推荐
+    user_selected BOOLEAN DEFAULT 1,    -- 用户是否选择跟踪此 TODO (1=已选择, 0=未选择)
+    priority VARCHAR(20),                -- 优先级: 'high', 'medium', 'low'
+    recommendation_tag VARCHAR(50),      -- 推荐标签: 'ai_recommended', 'quick_win', 'high_impact', 'doctor_suggested'
+
     -- 附件
     uploaded_images TEXT,      -- 上传的图片 URLs (JSON array)
     notes TEXT,                -- 用户笔记

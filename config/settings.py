@@ -35,10 +35,22 @@ class Settings:
     # Database Configuration
     # =========================================================================
     
+    # Database Type: 'sqlite' or 'mysql'
+    DB_TYPE: str = os.getenv('DB_TYPE', 'sqlite')
+    
+    # SQLite Configuration (默认)
     DB_PATH: str = os.getenv(
         'CGM_DB_PATH',
         str(PROJECT_ROOT / 'storage' / 'databases' / 'cgm_butler.db')
     )
+    
+    # MySQL Configuration
+    MYSQL_HOST: str = os.getenv('MYSQL_HOST', 'localhost')
+    MYSQL_PORT: int = int(os.getenv('MYSQL_PORT', '3306'))
+    MYSQL_USER: str = os.getenv('MYSQL_USER', 'root')
+    MYSQL_PASSWORD: str = os.getenv('MYSQL_PASSWORD', '')
+    MYSQL_DATABASE: str = os.getenv('MYSQL_DATABASE', 'cgm_butler')
+    MYSQL_CHARSET: str = os.getenv('MYSQL_CHARSET', 'utf8mb4')
     
     # =========================================================================
     # OpenAI Configuration

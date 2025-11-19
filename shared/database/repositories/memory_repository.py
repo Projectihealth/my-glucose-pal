@@ -48,18 +48,29 @@ class MemoryRepository(BaseRepository):
         limit: int = 10
     ) -> List[Dict]:
         """Get recent memories."""
-        rows = self.fetchall('''
-        SELECT * FROM user_memories 
-        WHERE user_id = ? AND created_at >= datetime('now', '-' || ? || ' days')
-        ORDER BY created_at DESC
-        LIMIT ?
-        ''', (user_id, days, limit))
+        # 根据数据库类型使用不同的日期函数
+        if self.db_type == 'mysql':
+            query = '''
+            SELECT * FROM user_memories 
+            WHERE user_id = ? AND created_at >= DATE_SUB(NOW(), INTERVAL ? DAY)
+            ORDER BY created_at DESC
+            LIMIT ?
+            '''
+        else:  # sqlite
+            query = '''
+            SELECT * FROM user_memories 
+            WHERE user_id = ? AND created_at >= datetime('now', '-' || ? || ' days')
+            ORDER BY created_at DESC
+            LIMIT ?
+            '''
+        
+        rows = self.fetchall(query, (user_id, days, limit))
         
         for row in rows:
             if row.get('key_topics'):
-                row['key_topics'] = json.loads(row['key_topics'])
+                row['key_topics'] = json.loads(row['key_topics']) if isinstance(row['key_topics'], str) else row['key_topics']
             if row.get('extracted_data'):
-                row['extracted_data'] = json.loads(row['extracted_data'])
+                row['extracted_data'] = json.loads(row['extracted_data']) if isinstance(row['extracted_data'], str) else row['extracted_data']
         
         return rows
     

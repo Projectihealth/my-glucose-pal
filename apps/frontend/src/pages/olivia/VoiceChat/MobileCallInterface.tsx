@@ -1,7 +1,17 @@
-import { useState, useEffect, useRef } from 'react';
-import { X, Mic, MessageSquare, MicOff, Bot, UserCircle } from 'lucide-react';
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { useRetellCall } from "../../../hooks/olivia/useRetellCall";
+import { useState, useEffect } from 'react';
+import { X, MessageSquare, Mic, MicOff } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { motion, AnimatePresence } from 'framer-motion';
+import { ImageWithFallback } from '@/components/ImageWithFallback';
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from '@/components/ui/sheet';
+import { useRetellCall } from '../../../hooks/olivia/useRetellCall';
 import { getStoredUserId } from '@/utils/userUtils';
 
 interface MobileCallInterfaceProps {
@@ -9,13 +19,24 @@ interface MobileCallInterfaceProps {
   onCallEnded: (callId: string | null, transcript: any[]) => void;
 }
 
+interface UserInfo {
+  name?: string;
+  avatar?: string;
+}
+
+interface Message {
+  speaker: 'coach' | 'patient';
+  text: string;
+  timestamp: number;
+}
+
 export function MobileCallInterface({ onBack, onCallEnded }: MobileCallInterfaceProps) {
   const userId = getStoredUserId();
-  const scrollAreaRef = useRef<HTMLDivElement>(null);
-  const [currentText, setCurrentText] = useState('');
   const [isMuted, setIsMuted] = useState(false);
-  const [showTranscript, setShowTranscript] = useState(false);
-  
+  const [isTranscriptOpen, setIsTranscriptOpen] = useState(false);
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [userInfo, setUserInfo] = useState<UserInfo>({ name: 'User' });
+
   const {
     startCall,
     endCall,
@@ -24,231 +45,285 @@ export function MobileCallInterface({ onBack, onCallEnded }: MobileCallInterface
     duration,
     callId,
     isAgentSpeaking,
+    toggleMute,
+    isMuted: hookIsMuted,
   } = useRetellCall(userId);
+
+  // Fetch user info from backend
+  useEffect(() => {
+    const fetchUserInfo = async () => {
+      try {
+        const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:5000';
+        const response = await fetch(`${backendUrl}/api/user/${userId}`);
+        if (response.ok) {
+          const data = await response.json();
+          setUserInfo({
+            name: data.name || 'User',
+            avatar: data.avatar_url,
+          });
+        }
+      } catch (error) {
+        console.error('Failed to fetch user info:', error);
+      }
+    };
+    fetchUserInfo();
+  }, [userId]);
 
   // Auto-start call when component mounts
   useEffect(() => {
     startCall();
   }, [startCall]);
 
-  // Update current text when transcript changes
+  // Sync mute state with hook
+  useEffect(() => {
+    setIsMuted(hookIsMuted);
+  }, [hookIsMuted]);
+
+  // Convert transcript to messages format
   useEffect(() => {
     if (transcript.length > 0) {
-      const lastMessage = transcript[transcript.length - 1];
-      setCurrentText(lastMessage.content);
-      console.log('[MobileCallInterface] Updated text:', lastMessage.content.substring(0, 50) + '...');
+      const newMessages: Message[] = transcript.map((msg, index) => ({
+        speaker: msg.role === 'agent' ? 'coach' : 'patient',
+        text: msg.content,
+        timestamp: index,
+      }));
+      setMessages(newMessages);
     }
   }, [transcript]);
 
-  // Debug: Log isAgentSpeaking changes
+  // Add initial greeting message
   useEffect(() => {
-    console.log('[MobileCallInterface] isAgentSpeaking changed:', isAgentSpeaking);
-  }, [isAgentSpeaking]);
-
-  // Handle call end
-  const handleEndCall = async () => {
-    await endCall();
-    onCallEnded(callId, transcript);
-  };
-
-  // Auto scroll to bottom when new messages arrive in transcript overlay
-  useEffect(() => {
-    if (scrollAreaRef.current && showTranscript) {
-      const scrollContainer = scrollAreaRef.current.querySelector('[data-radix-scroll-area-viewport]');
-      if (scrollContainer) {
-        scrollContainer.scrollTop = scrollContainer.scrollHeight;
-      }
+    if (messages.length === 0) {
+      setMessages([
+        {
+          speaker: 'coach',
+          text: `Hi ${userInfo.name?.split(' ')[0] || 'there'}! I'm Olivia, your CGM health coach—here to support you on your health journey.`,
+          timestamp: 0,
+        },
+      ]);
     }
-  }, [transcript, showTranscript]);
+  }, [userInfo.name]);
 
-  const formatDuration = (seconds: number) => {
+  // Current speaking message (last message)
+  const currentMessage = messages[messages.length - 1];
+
+  const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
+  const handleToggleMute = () => {
+    toggleMute();
+  };
+
+  const handleEndCall = async () => {
+    await endCall();
+    onCallEnded(callId, transcript);
+  };
+
   return (
-    <div className="absolute inset-0 bg-gradient-to-b from-[#F8F9FA] to-[#E8EBF0] flex flex-col overflow-hidden">
-      {/* Timer */}
-      <div className="absolute top-6 left-0 right-0 text-center z-10">
-        <p className="text-gray-500">{formatDuration(duration)}</p>
+    <div className="min-h-screen flex flex-col bg-gradient-to-b from-slate-900 to-slate-800 text-white relative">
+      {/* Header */}
+      <div className="px-6 pt-6 pb-4">
+        <div className="flex items-center justify-between mb-2">
+          <div className="text-sm text-gray-400">Call Duration</div>
+          <div className="px-3 py-1 bg-red-500/20 text-red-400 rounded-full text-sm flex items-center gap-2">
+            <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></div>
+            Recording
+          </div>
+        </div>
+        <div className="text-2xl text-white tabular-nums">{formatTime(duration)}</div>
       </div>
 
-      {/* Main Content */}
-      <div className="flex-1 flex flex-col px-6 pt-12 pb-48">
+      {/* Main Content Area - Centered */}
+      <div className="flex-1 flex flex-col items-center justify-center px-6 py-8">
         {/* Status Messages */}
         {callStatus.status === 'connecting' && (
-          <div className="text-center text-gray-500 text-sm py-4">
+          <div className="text-center text-gray-400 text-sm py-4 mb-4">
             Connecting to Olivia...
           </div>
         )}
         {callStatus.status === 'error' && (
-          <div className="text-center text-red-500 text-sm py-4 px-4 bg-red-50 rounded-lg">
+          <div className="text-center text-red-400 text-sm py-4 px-4 bg-red-500/20 rounded-lg mb-4">
             {callStatus.error}
           </div>
         )}
 
-        {/* Animated Orb - Upper portion */}
-        <div className="relative flex items-center justify-center flex-shrink-0" style={{ height: '32vh' }}>
-          {/* Outer glow rings - only show when agent is speaking */}
-          {isAgentSpeaking && (
-            <>
-              <div className="absolute inset-0 w-56 h-56 -translate-x-1/2 -translate-y-1/2 left-1/2 top-1/2">
-                <div className="absolute inset-0 rounded-full bg-[#5B7FF3]/20 animate-ping" style={{ animationDuration: '2s' }}></div>
-              </div>
-              <div className="absolute inset-0 w-48 h-48 -translate-x-1/2 -translate-y-1/2 left-1/2 top-1/2">
-                <div className="absolute inset-0 rounded-full bg-[#5B7FF3]/30 animate-ping" style={{ animationDuration: '1.5s' }}></div>
-              </div>
-            </>
-          )}
+        {/* Animated Avatar Area */}
+        <div className="relative flex items-center justify-center mb-8">
+          {/* Animated rings */}
+          <motion.div
+            className="absolute inset-0 flex items-center justify-center"
+            initial={{ scale: 0.8, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+          >
+            {[...Array(3)].map((_, i) => (
+              <motion.div
+                key={i}
+                className="absolute w-32 h-32 rounded-full border-2 border-blue-400/30"
+                animate={{
+                  scale: [1, 1.5, 2],
+                  opacity: [0.5, 0.3, 0],
+                }}
+                transition={{
+                  duration: 3,
+                  repeat: Infinity,
+                  delay: i * 1,
+                  ease: "easeOut"
+                }}
+              />
+            ))}
+          </motion.div>
 
-          {/* Background glow */}
-          <div className="absolute inset-0 w-40 h-40 rounded-full bg-[#5B7FF3] blur-xl opacity-30 left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2"></div>
-          
-          {/* Main avatar with photo */}
-          <div className={`relative w-40 h-40 rounded-full shadow-2xl transition-all duration-300 overflow-hidden ${
-            isAgentSpeaking ? 'scale-110' : 'scale-100'
-          }`} style={{
-            boxShadow: '0 0 60px rgba(91, 127, 243, 0.5), 0 0 100px rgba(91, 127, 243, 0.25)',
-            backgroundImage: 'url(https://www.cincinnati.com/gcdn/presto/2023/06/15/PCIN/998a4762-200a-4e57-a3dc-f4bc0d91593c-male_nurse_jobs_1030x687.jpeg?crop=515,687,x412,y0)',
-            backgroundSize: 'cover',
-            backgroundPosition: 'center'
-          }}>
-            {/* Subtle overlay for better integration */}
-            <div className="absolute inset-0 rounded-full bg-gradient-to-t from-black/10 via-transparent to-white/10"></div>
-            
-            {/* Animated shine effect */}
-            <div className="absolute inset-0 rounded-full overflow-hidden">
-              <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-br from-white/30 via-transparent to-transparent opacity-40"></div>
-            </div>
-          </div>
-        </div>
+          {/* Pulsing glow */}
+          <motion.div
+            className="absolute w-40 h-40 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full blur-3xl"
+            animate={{
+              scale: [1, 1.2, 1],
+              opacity: [0.3, 0.5, 0.3],
+            }}
+            transition={{
+              duration: 2,
+              repeat: Infinity,
+              ease: "easeInOut"
+            }}
+          />
 
-        {/* Text Display - Lower portion with fixed height */}
-        <div className="flex-1 flex flex-col items-center justify-start px-4 pt-8 min-h-0">
-          <div 
-            className="text-center max-w-md transition-all duration-500 ease-out overflow-hidden"
-            style={{ 
-              opacity: currentText ? 1 : 0.3,
-              transform: currentText ? 'translateY(0)' : 'translateY(20px)',
-              maxHeight: '25vh'
+          {/* Avatar */}
+          <motion.div
+            className="relative z-10"
+            animate={{
+              y: [0, -8, 0],
+            }}
+            transition={{
+              duration: 3,
+              repeat: Infinity,
+              ease: "easeInOut"
             }}
           >
-            <div className="overflow-y-auto max-h-full px-2">
-              <p className="text-gray-800 text-lg leading-relaxed">
-                {currentText || 'Listening...'}
-              </p>
+            <div className="w-32 h-32 rounded-full overflow-hidden border-4 border-white/20 shadow-2xl">
+              <ImageWithFallback
+                src="https://img.freepik.com/premium-photo/friendly-professional-handsome-male-doctor-portrait-picture-medical-hospital-doctor_969759-4074.jpg"
+                alt="Health Coach"
+                className="w-full h-full object-cover"
+              />
             </div>
-          </div>
-        </div>
-      </div>
 
-      {/* Bottom Controls */}
-      <div className="absolute bottom-12 left-0 right-0 px-8 z-20">
-        <div className="flex items-end justify-between">
-          {/* Exit Button */}
-          <button
-            onClick={handleEndCall}
-            className="flex flex-col items-center gap-2 active:scale-95 transition-transform"
-          >
-            <div className="w-14 h-14 rounded-full bg-white shadow-lg flex items-center justify-center border border-gray-200">
-              <X className="w-6 h-6 text-gray-700" />
-            </div>
-            <span className="text-xs text-gray-600">Exit</span>
-          </button>
-
-          {/* Microphone Button */}
-          <button
-            onClick={() => setIsMuted(!isMuted)}
-            className="flex flex-col items-center gap-2 active:scale-95 transition-transform -mb-4"
-            disabled={callStatus.status !== 'connected'}
-          >
-            <div className={`w-20 h-20 rounded-full bg-gradient-to-br shadow-2xl flex items-center justify-center transition-all ${
-              isMuted
-                ? 'from-gray-400 to-gray-500 shadow-gray-400/50'
-                : 'from-[#5B7FF3] to-[#4A90E2] shadow-[#5B7FF3]/40'
-            }`}>
-              {isMuted ? (
-                <MicOff className="w-9 h-9 text-white" />
-              ) : (
-                <Mic className="w-9 h-9 text-white" />
-              )}
-            </div>
-          </button>
-
-          {/* Transcript Button */}
-          <button
-            onClick={() => setShowTranscript(true)}
-            className="flex flex-col items-center gap-2 active:scale-95 transition-transform"
-          >
-            <div className="w-14 h-14 rounded-full bg-white shadow-lg flex items-center justify-center border border-gray-200">
-              <MessageSquare className="w-6 h-6 text-gray-700" />
-            </div>
-            <span className="text-xs text-gray-600">Transcript</span>
-          </button>
-        </div>
-      </div>
-
-      {/* Transcript Overlay */}
-      {showTranscript && (
-        <div className="absolute inset-0 bg-white z-50 flex flex-col">
-          <div className="bg-white border-b border-gray-100 px-4 py-4 flex items-center shadow-sm">
-            <button 
-              onClick={() => setShowTranscript(false)} 
-              className="p-2 -ml-2 active:bg-gray-100 rounded-full transition-colors"
+            {/* Active speaking indicator */}
+            <motion.div
+              className="absolute -bottom-2 left-1/2 -translate-x-1/2 px-3 py-1 bg-gradient-to-r from-blue-500 to-blue-600 rounded-full text-xs flex items-center gap-1.5 shadow-lg"
+              animate={{
+                scale: isAgentSpeaking ? [1, 1.1, 1] : 1,
+              }}
+              transition={{
+                duration: 0.5,
+                repeat: isAgentSpeaking ? Infinity : 0,
+              }}
             >
-              <X className="w-6 h-6 text-gray-700" />
-            </button>
-            <h2 className="text-gray-800 ml-3 font-medium">Conversation Transcript</h2>
-          </div>
-          
-          <div className="flex-1 overflow-hidden">
-            <ScrollArea ref={scrollAreaRef} className="h-full">
-              <div className="px-4 py-4 space-y-3">
-                {transcript.length === 0 ? (
-                  <div className="text-center text-gray-500 text-sm py-8">
-                    No conversation yet. Start talking to Olivia!
-                  </div>
-                ) : (
-                  transcript.map((message, index) => (
-                    <div
-                      key={index}
-                      className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
-                    >
-                      <div className={`flex gap-2 max-w-[85%] ${message.role === 'user' ? 'flex-row-reverse' : 'flex-row'}`}>
-                        {/* Avatar */}
-                        <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${
-                          message.role === 'agent' ? 'bg-[#EEF2FF]' : 'bg-gray-200'
-                        }`}>
-                          {message.role === 'agent' ? (
-                            <Bot className="w-4 h-4 text-[#5B7FF3]" />
-                          ) : (
-                            <UserCircle className="w-4 h-4 text-gray-600" />
-                          )}
-                        </div>
-
-                        {/* Message Bubble */}
-                        <div className={`rounded-2xl px-4 py-3 ${
-                          message.role === 'agent'
-                            ? 'bg-white border border-gray-200 shadow-sm'
-                            : 'bg-[#5B7FF3] text-white'
-                        }`}>
-                          <p className={`text-sm leading-relaxed ${
-                            message.role === 'agent' ? 'text-gray-700' : 'text-white'
-                          }`}>
-                            {message.content}
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-                  ))
-                )}
-              </div>
-            </ScrollArea>
-          </div>
+              <div className="w-1.5 h-1.5 bg-white rounded-full"></div>
+              <span>Olivia</span>
+            </motion.div>
+          </motion.div>
         </div>
-      )}
+
+        {/* Session Title */}
+        <div className="text-center mb-8">
+          <div className="text-lg text-white/90">Care Assistant</div>
+          <div className="text-sm text-gray-400 mt-1">Nutrition & Lifestyle Intake</div>
+        </div>
+
+        {/* Live Caption - Current Message */}
+        <div className="w-full max-w-md px-4">
+          <AnimatePresence mode="wait">
+            {currentMessage && (
+              <motion.div
+                key={currentMessage.timestamp}
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                className="bg-black/40 backdrop-blur-md rounded-2xl p-4 border border-white/10"
+              >
+                <div className="text-xs text-gray-400 mb-1">
+                  {currentMessage.speaker === 'coach' ? 'Olivia (Coach)' : userInfo.name}
+                </div>
+                <p className="text-sm text-white leading-relaxed">
+                  {currentMessage.text}
+                </p>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+      </div>
+
+      {/* Floating Transcript Button */}
+      <Sheet open={isTranscriptOpen} onOpenChange={setIsTranscriptOpen}>
+        <SheetTrigger asChild>
+          <button className="fixed bottom-24 right-6 w-14 h-14 bg-white/10 backdrop-blur-md border border-white/20 rounded-full flex items-center justify-center text-white hover:bg-white/20 transition-colors shadow-lg">
+            <MessageSquare className="w-5 h-5" />
+          </button>
+        </SheetTrigger>
+        <SheetContent side="bottom" className="h-[80vh] bg-white p-0">
+          <SheetHeader className="px-6 py-4 border-b border-gray-200">
+            <SheetTitle className="text-lg font-semibold text-gray-900">Live Transcript</SheetTitle>
+            <SheetDescription className="text-sm text-gray-600">Complete conversation history</SheetDescription>
+          </SheetHeader>
+          <div className="overflow-y-auto h-[calc(80vh-80px)] px-6 py-4 space-y-4">
+            {messages.map((msg, index) => (
+              <div
+                key={index}
+                className={`flex gap-3 ${msg.speaker === 'patient' ? 'flex-row-reverse' : ''}`}
+              >
+                <div className={`w-8 h-8 rounded-full flex-shrink-0 flex items-center justify-center text-xs font-medium text-white ${
+                  msg.speaker === 'coach' ? 'bg-gradient-to-br from-blue-500 to-blue-600' : 'bg-gradient-to-br from-purple-500 to-purple-600'
+                }`}>
+                  {msg.speaker === 'coach' ? 'O' : (userInfo.name?.[0] || 'U')}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className={`flex items-center gap-2 mb-1 ${msg.speaker === 'patient' ? 'justify-end' : ''}`}>
+                    <span className="text-xs font-medium text-gray-700">
+                      {msg.speaker === 'coach' ? 'Olivia (Coach)' : userInfo.name}
+                    </span>
+                  </div>
+                  <div className={`inline-block px-4 py-3 rounded-2xl max-w-full break-words ${
+                    msg.speaker === 'coach'
+                      ? 'bg-gray-100 text-gray-900 rounded-tl-sm'
+                      : 'bg-gradient-to-br from-blue-500 to-blue-600 text-white rounded-tr-sm'
+                  }`}>
+                    <p className="text-sm leading-relaxed">{msg.text}</p>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </SheetContent>
+      </Sheet>
+
+      {/* Control Bar */}
+      <div className="px-6 py-6 safe-area-bottom">
+        <div className="flex items-center justify-center gap-4">
+          <Button
+            variant="outline"
+            size="lg"
+            onClick={handleToggleMute}
+            disabled={callStatus.status !== 'connected'}
+            className={`w-16 h-16 rounded-full border-2 ${
+              isMuted 
+                ? 'bg-red-50 border-red-300 text-red-600 hover:bg-red-100' 
+                : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50'
+            }`}
+          >
+            {isMuted ? <MicOff className="w-6 h-6" /> : <Mic className="w-6 h-6" />}
+          </Button>
+
+          <Button
+            onClick={handleEndCall}
+            className="w-16 h-16 rounded-full bg-gradient-to-br from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white shadow-lg shadow-red-500/30"
+          >
+            <X className="w-7 h-7" />
+          </Button>
+        </div>
+      </div>
     </div>
   );
 }
-

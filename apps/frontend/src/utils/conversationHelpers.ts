@@ -206,20 +206,32 @@ function translateToEnglish(text: string): string {
  * Extract topic from summary (first meaningful sentence or key topics)
  */
 function extractTopic(summary: string, keyTopics: string[] = [], extractedData: Record<string, any> = {}): string {
-  // Check key topics first
+  // 0. Prefer model-generated session title if available
+  if (extractedData && typeof (extractedData as any).session_title === 'string' && (extractedData as any).session_title.trim().length > 0) {
+    return (extractedData as any).session_title.trim();
+  }
+
+  const normalizedSummary = (summary || '').toLowerCase();
+
+  // 1. Special-case ultra-brief greeting conversations
+  if (normalizedSummary.includes('brief interaction') && normalizedSummary.includes('no specific topics')) {
+    return 'Brief Check-in';
+  }
+
+  // 2. Check key topics first
   if (keyTopics && keyTopics.length > 0) {
     const topic = translateToEnglish(keyTopics[0]);
     return topic;
   }
 
-  // Check recommendations for topic
+  // 3. Check recommendations for topic
   if (extractedData?.specific_recommendations?.[0]?.topic) {
     const topic = extractedData.specific_recommendations[0].topic;
     const translated = translateToEnglish(topic);
     return translated.split('（')[0].split('(')[0]; // Remove parentheses content
   }
 
-  // Check commitments for context
+  // 4. Check commitments for context
   if (extractedData?.user_commitments?.[0]) {
     const commitment = extractedData.user_commitments[0];
     if (commitment.includes('早餐') || commitment.includes('breakfast')) return 'Breakfast Nutrition';
@@ -228,7 +240,7 @@ function extractTopic(summary: string, keyTopics: string[] = [], extractedData: 
     if (commitment.includes('散步') || commitment.includes('walk')) return 'Walking Routine';
   }
 
-  // Fallback to first sentence (translate if needed)
+  // 5. Fallback to first sentence (translate if needed)
   const firstSentence = summary.split(/[.!?。]/)[0].trim();
   const translated = translateToEnglish(firstSentence);
 

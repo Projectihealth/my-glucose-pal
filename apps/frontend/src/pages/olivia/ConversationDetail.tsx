@@ -1,5 +1,5 @@
 import { useNavigate, useParams } from 'react-router-dom';
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   ChevronLeft,
@@ -18,7 +18,8 @@ import {
   MoreHorizontal,
   Target
 } from 'lucide-react';
-import { getConversationDetail, ConversationDetail as ConversationDetailType } from '../../services/conversationsApi';
+import { useConversationDetail } from '../../hooks/useConversations';
+import type { ConversationDetail as ConversationDetailType } from '../../services/conversationsApi';
 
 interface Message {
   id: string;
@@ -246,6 +247,36 @@ function ConversationDetailContent({ conversation, onBack }: {
   onBack: () => void;
 }) {
   const [showTranscript, setShowTranscript] = useState(false);
+  const [isSummaryExpanded, setIsSummaryExpanded] = useState(false);
+  
+  // Parse summary into bullet points if it contains bullet characters
+  const parseSummary = (summary: string): { isBulletFormat: boolean; bullets: string[]; text: string } => {
+    if (!summary) return { isBulletFormat: false, bullets: [], text: summary };
+    
+    // Check if summary contains bullet points (• or -)
+    const hasBullets = summary.includes('•') || /^[\s]*[-*]\s/m.test(summary);
+    
+    if (hasBullets) {
+      // Split by bullet points and clean up
+      const bullets = summary
+        .split(/[•\n]/)
+        .map(b => b.trim())
+        .filter(b => b.length > 0)
+        // Also handle cases where bullets are on separate lines with dashes
+        .flatMap(b => b.split(/^[\s]*[-*]\s/m).map(s => s.trim()).filter(s => s.length > 0));
+      
+      return { isBulletFormat: true, bullets, text: summary };
+    }
+    
+    return { isBulletFormat: false, bullets: [], text: summary };
+  };
+  
+  const summaryData = parseSummary(conversation.summary);
+  
+  // Determine if summary is too long (should be collapsible)
+  const shouldBeCollapsible = summaryData.isBulletFormat 
+    ? summaryData.bullets.length > 3 
+    : conversation.summary.length > 300;
 
   const typeIcons = {
     voice: Mic,
@@ -306,9 +337,58 @@ function ConversationDetailContent({ conversation, onBack }: {
                 </span>
               )}
             </div>
-            <p className="text-gray-700 leading-relaxed" style={{ fontSize: '15px' }}>
-              {conversation.summary}
-            </p>
+            
+            {/* Summary Content with Collapsible Support */}
+            <div className="relative">
+              <div 
+                className={`text-gray-700 leading-relaxed transition-all duration-300 ${
+                  shouldBeCollapsible && !isSummaryExpanded ? 'max-h-[180px] overflow-hidden' : ''
+                }`}
+                style={{ fontSize: '15px' }}
+              >
+                {summaryData.isBulletFormat ? (
+                  // Bullet point format
+                  <ul className="space-y-3">
+                    {summaryData.bullets.map((bullet, index) => (
+                      <motion.li 
+                        key={index}
+                        initial={{ opacity: 0, x: -10 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ delay: index * 0.05 }}
+                        className="flex gap-2.5"
+                      >
+                        <span className="text-[#5B7FF3] flex-shrink-0 mt-0.5" style={{ fontSize: '16px' }}>•</span>
+                        <span className="flex-1">{bullet}</span>
+                      </motion.li>
+                    ))}
+                  </ul>
+                ) : (
+                  // Plain text format (legacy)
+                  <p>{conversation.summary}</p>
+                )}
+              </div>
+              
+              {/* Gradient fade when collapsed */}
+              {shouldBeCollapsible && !isSummaryExpanded && (
+                <div className="absolute bottom-0 left-0 right-0 h-12 bg-gradient-to-t from-white to-transparent pointer-events-none" />
+              )}
+            </div>
+            
+            {/* Expand/Collapse Button */}
+            {shouldBeCollapsible && (
+              <button
+                onClick={() => setIsSummaryExpanded(!isSummaryExpanded)}
+                className="mt-3 flex items-center gap-1.5 text-[#5B7FF3] hover:text-[#4a6de0] transition-colors mx-auto text-sm"
+                style={{ fontWeight: 500 }}
+              >
+                <span>{isSummaryExpanded ? 'Show Less' : 'Read More'}</span>
+                {isSummaryExpanded ? (
+                  <ChevronUp className="w-4 h-4" />
+                ) : (
+                  <ChevronDown className="w-4 h-4" />
+                )}
+              </button>
+            )}
           </motion.div>
 
           {/* Action Items Card */}
@@ -482,29 +562,11 @@ function ConversationDetailContent({ conversation, onBack }: {
 function ConversationDetail() {
   const navigate = useNavigate();
   const { conversationId } = useParams<{ conversationId: string }>();
-  const [conversation, setConversation] = useState<ConversationDetailType | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    const fetchConversation = async () => {
-      if (!conversationId) return;
-
-      try {
-        setIsLoading(true);
-        setError(null);
-        const data = await getConversationDetail(conversationId);
-        setConversation(data);
-      } catch (err) {
-        console.error('Failed to fetch conversation detail:', err);
-        setError('Failed to load conversation details');
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    fetchConversation();
-  }, [conversationId]);
+  
+  // Use React Query hook - automatically uses cache if available
+  const { data: conversation, isLoading, error: queryError } = useConversationDetail(conversationId);
+  
+  const error = queryError ? 'Failed to load conversation details' : null;
 
   if (isLoading) {
     return (

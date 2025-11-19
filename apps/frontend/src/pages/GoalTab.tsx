@@ -8,10 +8,10 @@ import { WeekProgress } from './goalTab/WeekProgress';
 import { WeeklySummaryModal } from './goalTab/WeeklySummaryModal';
 import * as todosApi from '@/services/todosApi';
 import { Todo } from '@/services/todosApi';
+import { getStoredUserId, USER_ID_CHANGE_EVENT } from '@/utils/userUtils';
 
 export function GoalTab() {
-  // TODO: Get user_id from authentication context
-  const userId = 'user_38377a3b'; // Hardcoded for now - should match your actual user ID
+  const [userId, setUserId] = useState<string>(() => getStoredUserId());
 
   const [todos, setTodos] = useState<Todo[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -22,9 +22,23 @@ export function GoalTab() {
   const [showWeekPicker, setShowWeekPicker] = useState(false);
   const [showWeeklySummary, setShowWeeklySummary] = useState(false);
 
-  // Fetch todos on component mount
+  // Sync with user selection changes
+  useEffect(() => {
+    const handleUserChange = () => {
+      setUserId(getStoredUserId());
+    };
+    window.addEventListener('storage', handleUserChange);
+    window.addEventListener(USER_ID_CHANGE_EVENT, handleUserChange);
+    return () => {
+      window.removeEventListener('storage', handleUserChange);
+      window.removeEventListener(USER_ID_CHANGE_EVENT, handleUserChange);
+    };
+  }, []);
+
+  // Fetch todos when user changes
   useEffect(() => {
     const fetchTodos = async () => {
+      if (!userId) return;
       try {
         setIsLoading(true);
         setError(null);
@@ -112,6 +126,10 @@ export function GoalTab() {
   const canGoForward = displayWeek ? historicalWeeks.indexOf(displayWeek) > 0 : false;
 
   const handleAddTodo = async (newTodo: { title: string; category: Todo['category']; health_benefit: string; target_count: number }) => {
+    if (!userId) {
+      alert('No active user detected. Please select a profile and try again.');
+      return;
+    }
     console.log('handleAddTodo called with:', newTodo);
     try {
       console.log('Calling API to create todo...');
@@ -152,6 +170,10 @@ export function GoalTab() {
         target_count: updatedTodo.target_count,
         current_count: updatedTodo.current_count,
         status: updatedTodo.status,
+        uploaded_images: updatedTodo.uploaded_images,
+        notes: updatedTodo.notes,
+        health_benefit: updatedTodo.health_benefit,
+        category: updatedTodo.category,
       });
       setTodos(prev => prev.map(t => t.id === updated.id ? updated : t));
     } catch (err) {
@@ -161,6 +183,10 @@ export function GoalTab() {
   };
 
   const handleAddToCurrentWeek = async (todo: Todo) => {
+    if (!userId) {
+      alert('No active user detected. Please select a profile and try again.');
+      return;
+    }
     console.log('handleAddToCurrentWeek called with todo:', todo);
     try {
       console.log('Creating todo for current week:', currentWeekStart);
@@ -279,7 +305,7 @@ export function GoalTab() {
         />
 
         {/* Week Progress Chart */}
-        <WeekProgress todos={currentWeekTodos} />
+        <WeekProgress todos={currentWeekTodos} userId={userId} weekStart={currentWeekStart} />
 
         {/* This Week Section */}
         <div>

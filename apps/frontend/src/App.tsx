@@ -76,10 +76,11 @@ const App = () => (
                 <Route path="/coach/text" element={<TextChat />} />
                 <Route path="/olivia/call-results" element={<CallResultsPage />} />
                 <Route path="/icon-preview" element={<IconPreview />} />
-              <Route path="/learn-more" element={<LearnMoreOrGoalTab />} />
-              <Route path="/learn-more/olivia" element={<OliviaOverview />} />
-              <Route path="/learn-more/cgm-foundations" element={<CgmFoundations />} />
-              <Route path="/learn-more/nutrition-playbook" element={<NutritionPlaybook />} />
+                <Route path="/goal" element={<GoalTab />} />
+                <Route path="/learn-more" element={<LearnMoreOrGoalTab />} />
+                <Route path="/learn-more/olivia" element={<OliviaOverview />} />
+                <Route path="/learn-more/cgm-foundations" element={<CgmFoundations />} />
+                <Route path="/learn-more/nutrition-playbook" element={<NutritionPlaybook />} />
                 <Route path="/community" element={<Community />} />
                 <Route path="/profile" element={<Profile />} />
                 {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}

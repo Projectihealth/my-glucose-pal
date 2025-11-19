@@ -1,27 +1,50 @@
+import { useEffect, useState, useMemo } from 'react';
 import { motion } from 'framer-motion';
-import { Todo } from '@/services/todosApi';
+import { getWeeklyStats, WeeklyStats, Todo } from '@/services/todosApi';
 
 interface WeekProgressProps {
   todos: Todo[];
+  userId: string;
+  weekStart: string;
 }
 
-export function WeekProgress({ todos }: WeekProgressProps) {
-  // Calculate daily completion rates (mock data for demonstration)
-  const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-  const completionRates = [
-    { day: 'Mon', rate: 100, completed: 3, total: 3 },
-    { day: 'Tue', rate: 85, completed: 2, total: 3 },
-    { day: 'Wed', rate: 100, completed: 3, total: 3 },
-    { day: 'Thu', rate: 67, completed: 2, total: 3 },
-    { day: 'Fri', rate: 0, completed: 0, total: 3 },  // Today - incomplete
-    { day: 'Sat', rate: 0, completed: 0, total: 3 },  // Future
-    { day: 'Sun', rate: 0, completed: 0, total: 3 },  // Future
-  ];
-
-  const currentDayIndex = 4; // Friday (0-indexed)
-  const weekAverage = Math.round(
-    completionRates.slice(0, currentDayIndex + 1).reduce((sum, day) => sum + day.rate, 0) / (currentDayIndex + 1)
+export function WeekProgress({ todos, userId, weekStart }: WeekProgressProps) {
+  const [stats, setStats] = useState<WeeklyStats | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const progressRefreshKey = useMemo(
+    () => todos.map(todo => `${todo.id}-${todo.current_count}-${todo.target_count}`).join('|'),
+    [todos]
   );
+
+  useEffect(() => {
+    if (!userId || !weekStart) return;
+
+    const fetchStats = async () => {
+      try {
+        setIsLoading(true);
+        setError(null);
+        const data = await getWeeklyStats(userId, weekStart);
+        setStats(data);
+      } catch (err) {
+        console.error('Failed to fetch weekly stats:', err);
+        setError('Failed to load weekly progress');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchStats();
+  }, [userId, weekStart, progressRefreshKey]);
+
+  const completionDays = stats?.days || [];
+  const currentDayIndex = (() => {
+    if (!stats) return -1;
+    const todayStr = new Date().toISOString().split('T')[0];
+    return stats.days.findIndex(d => d.date === todayStr);
+  })();
+
+  const weekAverage = stats?.week_average ?? 0;
 
   return (
     <div className="bg-white rounded-3xl p-5 border border-gray-100 shadow-sm">
@@ -33,6 +56,7 @@ export function WeekProgress({ todos }: WeekProgressProps) {
           </h3>
           <p className="text-xs text-gray-500">
             Daily completion rate
+            {error && <span className="text-red-400 ml-2">· {error}</span>}
           </p>
         </div>
         <div className="text-center">
@@ -45,13 +69,14 @@ export function WeekProgress({ todos }: WeekProgressProps) {
 
       {/* Bar Chart */}
       <div className="flex items-end justify-between gap-2 h-32 mb-3">
-        {completionRates.map((day, index) => {
-          const isFuture = index > currentDayIndex;
+        {completionDays.map((day, index) => {
+          const isFuture =
+            currentDayIndex >= 0 ? index > currentDayIndex : false;
           const isToday = index === currentDayIndex;
-          const height = isFuture ? 0 : (day.rate / 100) * 100;
+          const height = isFuture ? 0 : day.rate;
 
           return (
-            <div key={day.day} className="flex-1 flex flex-col items-center gap-1.5">
+            <div key={day.date} className="flex-1 flex flex-col items-center gap-1.5">
               {/* Bar */}
               <div className="w-full flex items-end h-24 relative group">
                 {!isFuture && (
@@ -87,7 +112,7 @@ export function WeekProgress({ todos }: WeekProgressProps) {
 
               {/* Day label */}
               <p className={`text-xs ${isToday ? 'text-[#5B7FF3] font-semibold' : 'text-gray-500'}`}>
-                {day.day}
+                {day.day_label}
               </p>
             </div>
           );

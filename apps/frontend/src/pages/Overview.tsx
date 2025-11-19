@@ -12,6 +12,7 @@ import {
 import { useUserPreferences } from "@/context/UserPreferencesContext";
 import { useGlucoseCalendarData } from "@/hooks/useGlucoseTrend";
 import ActivityLogButton from "@/components/ActivityLogButton";
+import { WeeklyToDo } from "@/components/WeeklyToDo";
 
 const Overview = () => {
   const { preferences } = useUserPreferences();
@@ -67,6 +68,7 @@ const Overview = () => {
     <div className="min-h-full space-y-8 relative">
       <GlucoseChart selectedDay={selectedDayUtc} onDayChange={handleChartDayChange} />
       <Dashboard selectedDay={selectedDayUtc} />
+      <WeeklyToDo />
       <MonthlyCalendar selectedDay={selectedDayLocal} onSelectDay={handleCalendarSelect} />
 
       {/* Floating Activity Log Button */}

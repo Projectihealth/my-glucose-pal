@@ -1,11 +1,22 @@
-import { useCallback, type KeyboardEvent, type MouseEvent } from "react";
+import { useCallback, useEffect, type KeyboardEvent, type MouseEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import { Hero } from "@/components/Hero";
 
 const Landing = () => {
   const navigate = useNavigate();
 
+  // Check if user has already seen the welcome page
+  useEffect(() => {
+    const hasSeenWelcome = localStorage.getItem("hasSeenWelcome");
+    if (hasSeenWelcome === "true") {
+      // User has seen welcome before, redirect to overview
+      navigate("/overview", { replace: true });
+    }
+  }, [navigate]);
+
   const handleEnter = useCallback(() => {
+    // Mark welcome as seen and navigate to overview
+    localStorage.setItem("hasSeenWelcome", "true");
     navigate("/overview");
   }, [navigate]);
 

@@ -137,7 +137,36 @@ class BaseRepository:
                 return value
 
         return value
-    
+
+    def _validate_string_length(self, value: str, max_length: int, field_name: str = "field") -> str:
+        """
+        Validate and truncate string if exceeds max length.
+
+        Args:
+            value: String value to validate
+            max_length: Maximum allowed length
+            field_name: Name of the field (for logging)
+
+        Returns:
+            Original or truncated string
+        """
+        if value is None:
+            return value
+
+        if not isinstance(value, str):
+            return value
+
+        actual_length = len(value)
+        if actual_length > max_length:
+            import logging
+            logging.warning(
+                f"String field '{field_name}' length ({actual_length}) exceeds "
+                f"max length ({max_length}). Truncating to fit."
+            )
+            return value[:max_length]
+
+        return value
+
     def _dict_from_row(self, row) -> Dict[str, Any]:
         """
         Convert row to dictionary.

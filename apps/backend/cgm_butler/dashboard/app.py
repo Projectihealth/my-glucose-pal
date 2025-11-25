@@ -38,7 +38,12 @@ from pattern_identification import CGMPatternIdentifier
 from digital_avatar.api import avatar_bp, init_avatar_api
 
 # 使用 shared 数据库模块
-from shared.database import get_connection, TodoRepository, MemoryRepository
+from shared.database import (
+    get_connection,
+    TodoRepository,
+    MemoryRepository,
+    UserRepository,
+)
 
 # 导入 todos API
 from todos_api import todos_bp
@@ -77,21 +82,28 @@ def chat():
 
 @app.route('/api/users')
 def get_all_users():
-    """获取所有用户列表 API"""
-    with CGMDatabase(DB_PATH) as db:
-        cursor = db.conn.cursor()
-        cursor.execute('SELECT user_id, name, conditions FROM users ORDER BY user_id')
-        users = [{'user_id': row[0], 'name': row[1], 'conditions': row[2]} 
-                 for row in cursor.fetchall()]
-        return jsonify(users)
+    """获取所有用户列表 API (尊重 DB_TYPE 设置)"""
+    try:
+        with get_connection() as conn:
+            user_repo = UserRepository(conn)
+            users = user_repo.list_users()
+            return jsonify(users)
+    except Exception as exc:
+        return jsonify({'error': str(exc)}), 500
 
 
 @app.route('/api/user/<user_id>')
 def get_user(user_id):
     """获取用户信息 API"""
-    with CGMDatabase(DB_PATH) as db:
-        user = db.get_user(user_id)
-        return jsonify(user if user else {'error': 'User not found'})
+    try:
+        with get_connection() as conn:
+            user_repo = UserRepository(conn)
+            user = user_repo.get_by_id(user_id)
+            if not user:
+                return jsonify({'error': 'User not found'}), 404
+            return jsonify(user)
+    except Exception as exc:
+        return jsonify({'error': str(exc)}), 500
 
 
 @app.route('/api/stats/<user_id>')

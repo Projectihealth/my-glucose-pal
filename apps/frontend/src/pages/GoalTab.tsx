@@ -8,10 +8,11 @@ import { WeekProgress } from './goalTab/WeekProgress';
 import { WeeklySummaryModal } from './goalTab/WeeklySummaryModal';
 import * as todosApi from '@/services/todosApi';
 import { Todo } from '@/services/todosApi';
-import { getStoredUserId, USER_ID_CHANGE_EVENT } from '@/utils/userUtils';
+import { TabHeader } from '@/components/TabHeader';
 
 export function GoalTab() {
-  const [userId, setUserId] = useState<string>(() => getStoredUserId());
+  // TODO: Get user_id from authentication context
+  const userId = 'user_38377a3b'; // Hardcoded for now - should match your actual user ID
 
   const [todos, setTodos] = useState<Todo[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -22,23 +23,9 @@ export function GoalTab() {
   const [showWeekPicker, setShowWeekPicker] = useState(false);
   const [showWeeklySummary, setShowWeeklySummary] = useState(false);
 
-  // Sync with user selection changes
-  useEffect(() => {
-    const handleUserChange = () => {
-      setUserId(getStoredUserId());
-    };
-    window.addEventListener('storage', handleUserChange);
-    window.addEventListener(USER_ID_CHANGE_EVENT, handleUserChange);
-    return () => {
-      window.removeEventListener('storage', handleUserChange);
-      window.removeEventListener(USER_ID_CHANGE_EVENT, handleUserChange);
-    };
-  }, []);
-
-  // Fetch todos when user changes
+  // Fetch todos on component mount
   useEffect(() => {
     const fetchTodos = async () => {
-      if (!userId) return;
       try {
         setIsLoading(true);
         setError(null);
@@ -126,10 +113,6 @@ export function GoalTab() {
   const canGoForward = displayWeek ? historicalWeeks.indexOf(displayWeek) > 0 : false;
 
   const handleAddTodo = async (newTodo: { title: string; category: Todo['category']; health_benefit: string; target_count: number }) => {
-    if (!userId) {
-      alert('No active user detected. Please select a profile and try again.');
-      return;
-    }
     console.log('handleAddTodo called with:', newTodo);
     try {
       console.log('Calling API to create todo...');
@@ -170,10 +153,6 @@ export function GoalTab() {
         target_count: updatedTodo.target_count,
         current_count: updatedTodo.current_count,
         status: updatedTodo.status,
-        uploaded_images: updatedTodo.uploaded_images,
-        notes: updatedTodo.notes,
-        health_benefit: updatedTodo.health_benefit,
-        category: updatedTodo.category,
       });
       setTodos(prev => prev.map(t => t.id === updated.id ? updated : t));
     } catch (err) {
@@ -183,10 +162,6 @@ export function GoalTab() {
   };
 
   const handleAddToCurrentWeek = async (todo: Todo) => {
-    if (!userId) {
-      alert('No active user detected. Please select a profile and try again.');
-      return;
-    }
     console.log('handleAddToCurrentWeek called with todo:', todo);
     try {
       console.log('Creating todo for current week:', currentWeekStart);
@@ -280,34 +255,27 @@ export function GoalTab() {
   }
 
   return (
-    <>
-      <div className="p-6 space-y-6 pb-24">
-        {/* Header */}
-        <div className="space-y-4 pt-6 pb-2">
-          <p className="text-[#5B7FF3] tracking-widest text-sm">
-            YOUR GOALS
-          </p>
-          <h1 className="text-gray-900 text-4xl leading-tight" style={{ fontWeight: 700 }}>
-            Daily Action Items
-          </h1>
-          <p className="text-gray-500 text-lg leading-relaxed">
-            Track your personalized health habits week by week.
-          </p>
-        </div>
+    <div className="min-h-screen bg-[#F8F9FA] pb-24">
+      <TabHeader
+        eyebrow="YOUR GOALS"
+        title="Daily Action Items"
+        subtitle="Track your personalized health habits week by week."
+      />
 
-        {/* Compact Progress Stats */}
+      <div className="px-6 space-y-6">
         <CompactProgressStats todos={currentWeekTodos} />
 
-        {/* Today View */}
         <TodayView
           todos={currentWeekTodos}
           onQuickCheckIn={handleToggleTodo}
         />
 
-        {/* Week Progress Chart */}
-        <WeekProgress todos={currentWeekTodos} userId={userId} weekStart={currentWeekStart} />
+        <WeekProgress
+          todos={currentWeekTodos}
+          userId={userId}
+          weekStart={currentWeekStart}
+        />
 
-        {/* This Week Section */}
         <div>
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-gray-800" style={{ fontWeight: 600 }}>
@@ -349,14 +317,12 @@ export function GoalTab() {
           </div>
         </div>
 
-        {/* Previous Weeks Section with Week Picker */}
         {historicalWeeks.length > 0 && (
           <div className="mt-8">
             <h2 className="text-gray-800 mb-4" style={{ fontWeight: 600 }}>
               Previous Weeks
             </h2>
 
-            {/* Week Picker Navigation */}
             <div className="bg-white rounded-3xl p-4 shadow-sm border border-gray-100 mb-3">
               <div className="flex items-center justify-between">
                 <button
@@ -401,7 +367,6 @@ export function GoalTab() {
               </div>
             </div>
 
-            {/* Historical Todos */}
             <div className="space-y-2">
               {displayWeek && todosByWeek[displayWeek]?.map(todo => (
                 <CompactTodoCard
@@ -417,7 +382,6 @@ export function GoalTab() {
         )}
       </div>
 
-      {/* Week Picker Modal */}
       <AnimatePresence>
         {showWeekPicker && (
           <WeekPickerModal
@@ -434,7 +398,6 @@ export function GoalTab() {
         )}
       </AnimatePresence>
 
-      {/* Add Todo Modal */}
       <AnimatePresence>
         {showAddModal && (
           <AddTodoModal
@@ -444,7 +407,6 @@ export function GoalTab() {
         )}
       </AnimatePresence>
 
-      {/* Weekly Summary Modal */}
       <AnimatePresence>
         {showWeeklySummary && (
           <WeeklySummaryModal
@@ -453,7 +415,7 @@ export function GoalTab() {
           />
         )}
       </AnimatePresence>
-    </>
+    </div>
   );
 }
 

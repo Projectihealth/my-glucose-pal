@@ -4,12 +4,13 @@ import { Mic, Video, MessageCircle, Sparkles } from 'lucide-react';
 import { processConversations } from '../../utils/conversationHelpers';
 import { getStoredUserId, USER_ID_CHANGE_EVENT } from '@/utils/userUtils';
 import { useConversationHistory, usePrefetchConversationDetail } from '../../hooks/useConversations';
+import { TabHeader } from '@/components/TabHeader';
 
 function OliviaHome() {
   const navigate = useNavigate();
 
   return (
-    <div className="min-h-full bg-[#F8F9FA]">
+    <div className="min-h-screen bg-[#F8F9FA] pb-24">
       <OliviaTab onNavigate={(view) => navigate(`/coach/${view}`)} />
     </div>
   );
@@ -62,19 +63,12 @@ function OliviaTab({ onNavigate }: { onNavigate: (view: 'voice' | 'video' | 'tex
 
   return (
     <>
-      <div className="px-6 py-8 space-y-6">
-        {/* Header */}
-        <div className="space-y-3 pt-4">
-          <p className="text-[#5B7FF3] tracking-[0.2em] uppercase" style={{ fontSize: '11px', fontWeight: 600 }}>
-            Olivia AI
-          </p>
-          <h1 className="text-gray-900 leading-tight" style={{ fontSize: '32px', fontWeight: 700, letterSpacing: '-0.02em' }}>
-            Your Personal Health Companion
-          </h1>
-          <p className="text-gray-500 leading-relaxed pt-1" style={{ fontSize: '15px' }}>
-            Connect with Olivia for personalized health guidance and support.
-          </p>
-        </div>
+      <div className="px-6 space-y-6">
+        <TabHeader
+          eyebrow="Olivia AI"
+          title="Your Personal Health Companion"
+          subtitle="Connect with Olivia for personalized health guidance and support."
+        />
 
         {/* Main Chat Button */}
         <button

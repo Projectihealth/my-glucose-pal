@@ -4,7 +4,7 @@ User Repository
 Handles user-related database operations.
 """
 
-from typing import Dict, Optional
+from typing import Dict, Optional, List
 from datetime import datetime
 
 from .base import BaseRepository
@@ -12,6 +12,12 @@ from .base import BaseRepository
 
 class UserRepository(BaseRepository):
     """Repository for user operations."""
+    
+    def list_users(self) -> List[Dict]:
+        """Return a list of all users ordered by ID."""
+        return self.fetchall(
+            'SELECT user_id, name, conditions FROM users ORDER BY user_id'
+        )
     
     def get_by_id(self, user_id: str) -> Optional[Dict]:
         """Get user by ID."""
@@ -74,4 +80,3 @@ class UserRepository(BaseRepository):
         self.commit()
         
         return True
-

@@ -63,6 +63,21 @@ export interface CheckInPayload {
   images?: string[];
 }
 
+export interface WeeklyStatsDay {
+  date: string;       // YYYY-MM-DD
+  day_label: string;  // Mon, Tue, ...
+  completed: number;
+  total: number;
+  rate: number;       // 0-100
+}
+
+export interface WeeklyStats {
+  user_id: string;
+  week_start: string;     // YYYY-MM-DD
+  days: WeeklyStatsDay[];
+  week_average: number;   // 0-100
+}
+
 /**
  * Get todos for a user
  */
@@ -200,4 +215,34 @@ export async function resetDailyCompletion(userId: string): Promise<number> {
 
   const data = await response.json();
   return data.count;
+}
+
+/**
+ * Get weekly completion stats for a user
+ *
+ * Maps to backend endpoint:
+ *   GET /api/todos/weekly-stats/<user_id>?week_start=YYYY-MM-DD
+ */
+export async function getWeeklyStats(
+  userId: string,
+  weekStart?: string
+): Promise<WeeklyStats> {
+  const params = new URLSearchParams();
+  if (weekStart) {
+    params.append('week_start', weekStart);
+  }
+
+  const query = params.toString();
+  const url = `${API_BASE_URL}/api/todos/weekly-stats/${encodeURIComponent(userId)}${
+    query ? `?${query}` : ''
+  }`;
+
+  const response = await fetch(url);
+
+  if (!response.ok) {
+    throw new Error(`Failed to fetch weekly stats: ${response.statusText}`);
+  }
+
+  const data = await response.json();
+  return data as WeeklyStats;
 }

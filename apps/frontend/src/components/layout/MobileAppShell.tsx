@@ -6,6 +6,7 @@ import {
   LineChart,
   MessageCircle,
   Signal,
+  Target,
   Users,
   Wifi,
 } from "lucide-react";
@@ -21,8 +22,8 @@ interface MobileAppShellProps {
 const navItems = [
   { label: "My CGM", icon: LineChart, path: "/overview" },
   { label: "Olivia", icon: MessageCircle, path: "/coach" },
-  { label: "Community", icon: Users, path: "/community" },
-  { label: "Learn More", icon: LayoutGrid, path: "/learn-more" },
+  { label: "My Goals", icon: Target, path: "/goal" },
+  { label: "Learn", icon: LayoutGrid, path: "/community" },
   { label: "Profile", icon: CircleUserRound, path: "/profile" },
 ];
 

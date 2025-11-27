@@ -10,6 +10,7 @@ import Landing from "./pages/Landing";
 import Overview from "./pages/Overview";
 import LearnMore from "./pages/LearnMore";
 import { GoalTab } from "./pages/GoalTab";
+import GoalApp from "./pages/goal/App";
 import Coach from "./pages/Coach";
 import Profile from "./pages/Profile";
 import Community from "./pages/Community";
@@ -24,38 +25,8 @@ import VideoChat from "./pages/olivia/VideoChat";
 import TextChat from "./pages/olivia/TextChat";
 import { CallResultsPage } from "./pages/olivia/CallResultsPage";
 import IconPreview from "./pages/IconPreview";
-import { useState, useEffect } from "react";
 
 const queryClient = new QueryClient();
-
-// Wrapper component to conditionally show GoalTab or LearnMore based on beta mode
-const LearnMoreOrGoalTab = () => {
-  const [isBetaMode, setIsBetaMode] = useState<boolean>(false);
-
-  useEffect(() => {
-    // Listen to storage changes to update when beta mode is toggled
-    const checkBetaMode = () => {
-      const betaMode = localStorage.getItem('betaMode') === 'true';
-      setIsBetaMode(betaMode);
-    };
-
-    checkBetaMode();
-
-    // Listen for storage changes (when beta button is clicked)
-    window.addEventListener('storage', checkBetaMode);
-
-    // Custom event for same-window updates
-    const handleBetaModeChange = () => checkBetaMode();
-    window.addEventListener('betaModeChange', handleBetaModeChange);
-
-    return () => {
-      window.removeEventListener('storage', checkBetaMode);
-      window.removeEventListener('betaModeChange', handleBetaModeChange);
-    };
-  }, []);
-
-  return isBetaMode ? <GoalTab /> : <LearnMore />;
-};
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
@@ -76,8 +47,9 @@ const App = () => (
                 <Route path="/coach/text" element={<TextChat />} />
                 <Route path="/olivia/call-results" element={<CallResultsPage />} />
                 <Route path="/icon-preview" element={<IconPreview />} />
-                <Route path="/goal" element={<GoalTab />} />
-                <Route path="/learn-more" element={<LearnMoreOrGoalTab />} />
+                <Route path="/goal" element={<GoalApp />} />
+                <Route path="/goal-old" element={<GoalTab />} />
+                <Route path="/learn-more" element={<LearnMore />} />
                 <Route path="/learn-more/olivia" element={<OliviaOverview />} />
                 <Route path="/learn-more/cgm-foundations" element={<CgmFoundations />} />
                 <Route path="/learn-more/nutrition-playbook" element={<NutritionPlaybook />} />

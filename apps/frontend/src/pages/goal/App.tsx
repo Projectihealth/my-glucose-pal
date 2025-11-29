@@ -18,6 +18,8 @@ import { FireIcon, SparklesIcon, ChevronRightIcon, PlusIcon, TargetIcon, LockIco
 import { CreateHabitModal } from './components/CreateHabitModal';
 import { StreakModal } from './components/StreakModal';
 import { HabitDetailsModal } from './components/HabitDetailsModal';
+import { getStoredUserId } from '@/utils/userUtils';
+import * as habitsApi from '@/services/habitsApi';
 
 // --- MOCK DATA ---
 const MOCK_HABITS: Habit[] = [
@@ -95,9 +97,11 @@ const LAST_WEEK_DAILY_STATS = [
 ];
 
 export default function App() {
+  const userId = getStoredUserId();
   const [currentDate, setCurrentDate] = useState<Date>(new Date());
-  const [habits, setHabits] = useState<Habit[]>(MOCK_HABITS);
-  const [archivedHabits, setArchivedHabits] = useState<Habit[]>(MOCK_ARCHIVED_HABITS);
+  const [habits, setHabits] = useState<Habit[]>([]);
+  const [archivedHabits, setArchivedHabits] = useState<Habit[]>([]);
+  const [isLoadingHabits, setIsLoadingHabits] = useState(true);
 
   // AI Recommendations State
   const [recommendations, setRecommendations] = useState<Recommendation[]>([]);
@@ -139,40 +143,87 @@ export default function App() {
   };
 
   // --- EFFECTS ---
+
+  // Load habits from API
   useEffect(() => {
-    // Simulate AI fetch
-    const fetchInsight = async () => {
-      setIsLoadingRecs(true);
-      const recs = await getHealthRecommendation(stats, habits);
-      setRecommendations(recs);
-      setIsLoadingRecs(false);
+    const loadHabits = async () => {
+      try {
+        setIsLoadingHabits(true);
+        const fetchedHabits = await habitsApi.getHabits(userId);
+        setHabits(fetchedHabits);
+      } catch (error) {
+        console.error('Failed to load habits:', error);
+        // Fallback to mock data on error
+        setHabits(MOCK_HABITS);
+      } finally {
+        setIsLoadingHabits(false);
+      }
     };
 
-    if (recommendations.length === 0) {
-        fetchInsight();
-    }
+    loadHabits();
+  }, [userId]);
+
+  // Fetch AI recommendations
+  useEffect(() => {
+    const fetchInsight = async () => {
+      if (habits.length === 0 || recommendations.length > 0) return;
+
+      setIsLoadingRecs(true);
+      try {
+        const recs = await getHealthRecommendation(stats, habits);
+        setRecommendations(recs);
+      } catch (error) {
+        console.error('Failed to load recommendations:', error);
+      } finally {
+        setIsLoadingRecs(false);
+      }
+    };
+
+    fetchInsight();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [habits.length]);
 
   // --- HANDLERS ---
-  const handleToggleHabit = (id: string) => {
-    setHabits(prev => prev.map(h => {
-      if (h.id !== id) return h;
+  const handleToggleHabit = async (id: string) => {
+    const habit = habits.find(h => h.id === id);
+    if (!habit) return;
 
-      const isCompleted = !!h.logs[selectedDateStr];
-      const newLogs = { ...h.logs };
+    const isCompleted = !!habit.logs[selectedDateStr];
 
+    try {
       if (isCompleted) {
-        delete newLogs[selectedDateStr];
+        // Delete the log
+        await habitsApi.deleteHabitLog(id, selectedDateStr);
+
+        // Update local state
+        setHabits(prev => prev.map(h => {
+          if (h.id !== id) return h;
+          const newLogs = { ...h.logs };
+          delete newLogs[selectedDateStr];
+          return { ...h, logs: newLogs };
+        }));
       } else {
-        newLogs[selectedDateStr] = {
+        // Create/update the log
+        await habitsApi.toggleHabitLog(id, {
+          log_date: selectedDateStr,
+          status: 'COMPLETED'
+        });
+
+        // Update local state
+        setHabits(prev => prev.map(h => {
+          if (h.id !== id) return h;
+          const newLogs = { ...h.logs };
+          newLogs[selectedDateStr] = {
             status: 'COMPLETED',
             timestamp: Date.now()
-        };
+          };
+          return { ...h, logs: newLogs };
+        }));
       }
-
-      return { ...h, logs: newLogs };
-    }));
+    } catch (error) {
+      console.error('Failed to toggle habit:', error);
+      // TODO: Show error toast
+    }
   };
 
   const handleUpdateLog = (habitId: string, log: DailyLog | null) => {
@@ -193,8 +244,14 @@ export default function App() {
       setIsDetailModalOpen(true);
   };
 
-  const handleDeleteHabit = (id: string) => {
-    setHabits(prev => prev.filter(h => h.id !== id));
+  const handleDeleteHabit = async (id: string) => {
+    try {
+      await habitsApi.deleteHabit(id);
+      setHabits(prev => prev.filter(h => h.id !== id));
+    } catch (error) {
+      console.error('Failed to delete habit:', error);
+      // TODO: Show error toast
+    }
   };
 
   const handleEditHabit = (habit: Habit) => {
@@ -203,7 +260,9 @@ export default function App() {
   };
 
   const handleDateSelect = (dateStr: string) => {
-    setCurrentDate(new Date(dateStr));
+    // Parse date string properly to avoid timezone issues
+    const [year, month, day] = dateStr.split('-').map(Number);
+    setCurrentDate(new Date(year, month - 1, day));
   };
 
   const handlePrevWeek = () => {
@@ -214,26 +273,57 @@ export default function App() {
     setCurrentDate(prev => addWeeks(prev, 1));
   };
 
-  const handleSaveHabit = (habitData: Omit<Habit, 'id' | 'logs' | 'streak'>) => {
-    if (editingHabit) {
+  const handleSaveHabit = async (habitData: Omit<Habit, 'id' | 'logs' | 'streak'>) => {
+    try {
+      // Map frontend category to backend category
+      const categoryMap: Record<string, string> = {
+        'NUTRITION': 'diet',
+        'EXERCISE': 'exercise',
+        'SLEEP': 'sleep',
+        'MINDFULNESS': 'stress',
+        'OTHER': 'other'
+      };
+
+      if (editingHabit) {
         // Update existing habit
+        await habitsApi.updateHabit(editingHabit.id, {
+          title: habitData.title,
+          description: habitData.description,
+          category: categoryMap[habitData.category] || 'other',
+          emoji: habitData.emoji,
+          frequency: habitData.frequency
+        });
+
         setHabits(prev => prev.map(h =>
-            h.id === editingHabit.id
-                ? { ...h, ...habitData }
-                : h
+          h.id === editingHabit.id
+            ? { ...h, ...habitData }
+            : h
         ));
         setEditingHabit(null);
-    } else {
+      } else {
         // Create new habit
+        const result = await habitsApi.createHabit({
+          user_id: userId,
+          title: habitData.title,
+          description: habitData.description,
+          category: categoryMap[habitData.category] || 'other',
+          emoji: habitData.emoji,
+          frequency: habitData.frequency
+        });
+
         const newHabit: Habit = {
-            ...habitData,
-            id: `custom-${Date.now()}`,
-            logs: {},
-            streak: 0
+          ...habitData,
+          id: String(result.id),
+          logs: {},
+          streak: 0
         };
         setHabits(prev => [...prev, newHabit]);
+      }
+      setIsAddModalOpen(false);
+    } catch (error) {
+      console.error('Failed to save habit:', error);
+      // TODO: Show error toast
     }
-    setIsAddModalOpen(false);
   };
 
   const handleAddRecommendation = (rec: Recommendation) => {
@@ -429,7 +519,9 @@ export default function App() {
         <section>
             <div className="flex justify-between items-center mb-4">
                 <div className="flex items-center gap-3">
-                    <h3 className="font-bold text-gray-900" style={{ fontSize: '18px' }}>Today's Habits</h3>
+                    <h3 className="font-bold text-gray-900" style={{ fontSize: '18px' }}>
+                        {isSameDay(currentDate, new Date()) ? "Today's Habits" : format(currentDate, 'MMM d')}
+                    </h3>
                     <span className="text-xs font-bold text-gray-500 bg-gray-100 px-2.5 py-1 rounded-full">
                         {completedCount}/{totalHabits}
                     </span>

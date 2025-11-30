@@ -69,10 +69,17 @@ class HabitLogsRepository(BaseRepository):
         Returns:
             Habit log dict or None
         """
-        return self.fetchone(
+        log = self.fetchone(
             'SELECT * FROM habit_logs WHERE habit_id = ? AND log_date = ?',
             (habit_id, log_date)
         )
+
+        # Convert date to ISO string for JSON serialization
+        if log and 'log_date' in log:
+            if hasattr(log['log_date'], 'isoformat'):
+                log['log_date'] = log['log_date'].isoformat()
+
+        return log
 
     def get_logs_by_habit(
         self,
@@ -227,7 +234,12 @@ class HabitLogsRepository(BaseRepository):
         current_date = end_date
 
         for log in logs:
-            log_date = datetime.fromisoformat(log['log_date']).date()
+            # Handle both string and date object (MySQL returns date objects)
+            log_date_raw = log['log_date']
+            if isinstance(log_date_raw, str):
+                log_date = datetime.fromisoformat(log_date_raw).date()
+            else:
+                log_date = log_date_raw  # Already a date object
 
             # Check if this log is for the current expected date
             if log_date == current_date:
@@ -263,7 +275,12 @@ class HabitLogsRepository(BaseRepository):
 
         logs_dict = {}
         for log in logs:
-            logs_dict[log['log_date']] = {
+            # Convert date to string if it's a date object (MySQL returns date objects)
+            log_date = log['log_date']
+            if hasattr(log_date, 'isoformat'):
+                log_date = log_date.isoformat()
+
+            logs_dict[log_date] = {
                 'status': log['status'],
                 'timestamp': log['timestamp'],
                 'note': log.get('note')

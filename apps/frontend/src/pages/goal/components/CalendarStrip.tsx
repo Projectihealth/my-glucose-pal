@@ -39,22 +39,22 @@ export const CalendarStrip: React.FC<CalendarStripProps> = ({
       </div>
 
       {/* Days Strip */}
-      <div className="flex justify-between items-center overflow-x-auto no-scrollbar py-2 px-1">
+      <div className="flex justify-center items-center gap-1 overflow-x-auto no-scrollbar py-2 px-0">
         {dates.map((item, index) => (
           <button
             key={index}
             onClick={() => onSelectDate(item.fullDate)}
             className={`
-              relative flex flex-col items-center justify-center w-[3.25rem] h-[4.5rem] rounded-2xl transition-all duration-300 snap-center
+              relative flex flex-col items-center justify-center flex-shrink-0 w-11 h-[4rem] rounded-2xl transition-all duration-300 snap-center
               ${item.isSelected
                 ? 'bg-blue-500 text-blue-100 shadow-lg shadow-blue-200 scale-105 -translate-y-1'
                 : 'bg-white text-slate-400 hover:bg-slate-50 border border-transparent'}
             `}
           >
-            <span className={`text-[11px] font-medium mb-0.5 ${item.isSelected ? 'text-blue-100' : 'text-slate-400'}`}>
+            <span className={`text-[10px] font-medium mb-0.5 ${item.isSelected ? 'text-blue-100' : 'text-slate-400'}`}>
               {item.day}
             </span>
-            <span className={`text-lg font-bold ${item.isSelected ? 'text-white' : 'text-slate-800'}`}>
+            <span className={`text-base font-bold ${item.isSelected ? 'text-white' : 'text-slate-800'}`}>
               {item.date}
             </span>
 

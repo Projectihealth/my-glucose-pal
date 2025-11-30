@@ -218,6 +218,7 @@ CREATE TABLE IF NOT EXISTS user_todos (
     description TEXT,
     category VARCHAR(50),      -- 'diet', 'exercise', 'sleep', 'stress', 'medication', 'other'
     health_benefit TEXT,       -- 健康益处说明
+    emoji VARCHAR(10),         -- Emoji icon for the habit
 
     -- 时间相关
     time_of_day VARCHAR(50),   -- 时间段 (e.g., '09:00-10:00')

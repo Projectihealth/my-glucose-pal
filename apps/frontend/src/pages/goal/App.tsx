@@ -536,7 +536,7 @@ export default function App() {
                 </button>
             </div>
 
-            <div className="space-y-3">
+            <div className="space-y-2.5">
                 {habitsForDate.map(habit => (
                     <HabitCard
                         key={habit.id}

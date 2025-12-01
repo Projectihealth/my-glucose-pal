@@ -21,8 +21,8 @@ interface MobileAppShellProps {
 const navItems = [
   { label: "My CGM", icon: LineChart, path: "/overview" },
   { label: "Olivia", icon: MessageCircle, path: "/coach" },
+  { label: "Goal", icon: LayoutGrid, path: "/goal" },
   { label: "Community", icon: Users, path: "/community" },
-  { label: "Learn More", icon: LayoutGrid, path: "/learn-more" },
   { label: "Profile", icon: CircleUserRound, path: "/profile" },
 ];
 

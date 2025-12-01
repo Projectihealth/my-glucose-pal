@@ -18,7 +18,7 @@ if project_root not in sys.path:
 
 # 使用新的 shared/database
 from shared.database import get_connection, TodoRepository
-from shared.database.repositories.todo_checkin_repository import TodoCheckinRepository
+# from shared.database.repositories.todo_checkin_repository import TodoCheckinRepository
 
 # Create Blueprint
 todos_bp = Blueprint('todos', __name__, url_prefix='/api/todos')
@@ -254,15 +254,15 @@ def check_in_todo(todo_id: int):
                 return jsonify({'error': 'Failed to check in todo'}), 500
 
             # 记录每日 check-in，用于周统计
-            try:
-                checkin_repo = TodoCheckinRepository(conn)
-                checkin_repo.create(
-                    user_id=existing_todo['user_id'],
-                    todo_id=todo_id,
-                )
-            except Exception as e:
-                # 不让统计失败影响主流程，只打印日志
-                print(f"⚠️ Failed to create todo_checkin record: {e}")
+            # try:
+            #     checkin_repo = TodoCheckinRepository(conn)
+            #     checkin_repo.create(
+            #         user_id=existing_todo['user_id'],
+            #         todo_id=todo_id,
+            #     )
+            # except Exception as e:
+            #     # 不让统计失败影响主流程，只打印日志
+            #     print(f"⚠️ Failed to create todo_checkin record: {e}")
 
             # Get the updated todo
             todo = todo_repo.get_by_id(todo_id)
@@ -328,10 +328,19 @@ def get_weekly_stats(user_id: str):
         week_start = monday.isoformat()
 
     try:
-        with get_connection() as conn:
-            checkin_repo = TodoCheckinRepository(conn)
-            stats = checkin_repo.get_weekly_completion(user_id, week_start)
-            return jsonify(stats)
+        # TODO: Implement TodoCheckinRepository for weekly stats
+        # For now, return empty stats
+        stats = {
+            'stats': {
+                'total_todos': 0,
+                'completed_todos': 0,
+                'in_progress_todos': 0,
+                'completion_rate': 0,
+                'daily_completion': {},
+                'category_breakdown': {}
+            }
+        }
+        return jsonify(stats)
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 

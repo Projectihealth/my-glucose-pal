@@ -63,6 +63,25 @@ export interface CheckInPayload {
   images?: string[];
 }
 
+export interface WeeklyStats {
+  total_todos: number;
+  completed_todos: number;
+  in_progress_todos: number;
+  completion_rate: number;
+  daily_completion: {
+    [date: string]: {
+      completed: number;
+      total: number;
+    };
+  };
+  category_breakdown: {
+    [category: string]: {
+      total: number;
+      completed: number;
+    };
+  };
+}
+
 /**
  * Get todos for a user
  */
@@ -200,4 +219,26 @@ export async function resetDailyCompletion(userId: string): Promise<number> {
 
   const data = await response.json();
   return data.count;
+}
+
+/**
+ * Get weekly statistics for a user's todos
+ */
+export async function getWeeklyStats(
+  userId: string,
+  weekStart: string
+): Promise<WeeklyStats> {
+  const params = new URLSearchParams({
+    user_id: userId,
+    week_start: weekStart,
+  });
+
+  const response = await fetch(`${API_BASE_URL}/api/todos/weekly-stats?${params.toString()}`);
+
+  if (!response.ok) {
+    throw new Error(`Failed to fetch weekly stats: ${response.statusText}`);
+  }
+
+  const data = await response.json();
+  return data.stats;
 }

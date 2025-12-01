@@ -11,7 +11,6 @@ from .cgm_repository import CGMRepository
 from .user_repository import UserRepository
 from .onboarding_status_repository import OnboardingStatusRepository
 from .todo_repository import TodoRepository
-from .todo_checkin_repository import TodoCheckinRepository
 
 __all__ = [
     'BaseRepository',
@@ -21,6 +20,5 @@ __all__ = [
     'UserRepository',
     'OnboardingStatusRepository',
     'TodoRepository',
-    'TodoCheckinRepository',
 ]
 

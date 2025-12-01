@@ -112,9 +112,11 @@ cd "$PROJECT_ROOT/apps/minerva"
 if [ -d "$PROJECT_ROOT/venv" ]; then
     source "$PROJECT_ROOT/venv/bin/activate"
     echo -e "${GREEN}✓${NC} Virtual environment activated"
+    uvicorn main:app --host 127.0.0.1 --port 8000 > "$LOG_DIR/minerva.log" 2>&1 &
+else
+    # Use miniconda uvicorn if available
+    /Users/ellaquan/miniconda3/bin/uvicorn main:app --host 127.0.0.1 --port 8000 > "$LOG_DIR/minerva.log" 2>&1 &
 fi
-
-uvicorn main:app --host 127.0.0.1 --port 8000 > "$LOG_DIR/minerva.log" 2>&1 &
 MINERVA_PID=$!
 echo $MINERVA_PID > "$PID_DIR/minerva.pid"
 echo -e "${GREEN}✓${NC} Minerva service started (PID: $MINERVA_PID)"

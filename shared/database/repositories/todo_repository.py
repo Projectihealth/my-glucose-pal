@@ -87,11 +87,11 @@ class TodoRepository(BaseRepository):
         self.execute('''
         INSERT INTO user_todos (
             user_id, conversation_id, title, description, category,
-            health_benefit, time_of_day, time_description,
+            health_benefit, emoji, time_of_day, time_description,
             target_count, current_count, status, completed_today,
             user_selected, priority, recommendation_tag,
             uploaded_images, notes, week_start, created_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ''', (
             user_id,
             kwargs.get('conversation_id'),
@@ -99,6 +99,7 @@ class TodoRepository(BaseRepository):
             kwargs.get('description'),
             kwargs.get('category'),
             kwargs.get('health_benefit'),
+            kwargs.get('emoji'),
             kwargs.get('time_of_day'),
             kwargs.get('time_description'),
             kwargs.get('target_count', 1),
@@ -144,7 +145,7 @@ class TodoRepository(BaseRepository):
                 kwargs[bool_field] = self._normalize_bool_for_db(kwargs[bool_field])
 
         for field in [
-            'title', 'description', 'category', 'health_benefit',
+            'title', 'description', 'category', 'health_benefit', 'emoji',
             'time_of_day', 'time_description', 'target_count',
             'current_count', 'status', 'completed_today',
             'user_selected', 'priority', 'recommendation_tag',

@@ -218,6 +218,7 @@ CREATE TABLE IF NOT EXISTS user_todos (
     description TEXT,
     category VARCHAR(50),
     health_benefit TEXT,
+    emoji VARCHAR(10),
 
     -- 时间相关
     time_of_day VARCHAR(50),

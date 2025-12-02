@@ -531,6 +531,7 @@ def create_todo():
                 'description': data.get('description'),
                 'category': data.get('category'),
                 'health_benefit': data.get('health_benefit'),
+                'emoji': data.get('emoji'),
                 'time_of_day': data.get('time_of_day'),
                 'time_description': data.get('time_description'),
                 'target_count': data.get('target_count', 1),

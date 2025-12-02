@@ -17,8 +17,8 @@ if project_root not in sys.path:
     sys.path.insert(0, project_root)
 
 # 使用新的 shared/database
-from shared.database import get_connection, TodoRepository
-# from shared.database.repositories.todo_checkin_repository import TodoCheckinRepository
+from shared.database import get_connection, TodoRepository, HabitLogsRepository
+from shared.database.repositories.todo_checkin_repository import TodoCheckinRepository
 
 # Create Blueprint
 todos_bp = Blueprint('todos', __name__, url_prefix='/api/todos')
@@ -120,6 +120,7 @@ def create_todo():
                 'description': data.get('description'),
                 'category': data.get('category'),
                 'health_benefit': data.get('health_benefit'),
+                'emoji': data.get('emoji'),
                 'time_of_day': data.get('time_of_day'),
                 'time_description': data.get('time_description'),
                 'target_count': data.get('target_count', 1),
@@ -254,15 +255,15 @@ def check_in_todo(todo_id: int):
                 return jsonify({'error': 'Failed to check in todo'}), 500
 
             # 记录每日 check-in，用于周统计
-            # try:
-            #     checkin_repo = TodoCheckinRepository(conn)
-            #     checkin_repo.create(
-            #         user_id=existing_todo['user_id'],
-            #         todo_id=todo_id,
-            #     )
-            # except Exception as e:
-            #     # 不让统计失败影响主流程，只打印日志
-            #     print(f"⚠️ Failed to create todo_checkin record: {e}")
+            try:
+                checkin_repo = TodoCheckinRepository(conn)
+                checkin_repo.create(
+                    user_id=existing_todo['user_id'],
+                    todo_id=todo_id,
+                )
+            except Exception as e:
+                # 不让统计失败影响主流程，只打印日志
+                print(f"⚠️ Failed to create todo_checkin record: {e}")
 
             # Get the updated todo
             todo = todo_repo.get_by_id(todo_id)
@@ -328,19 +329,10 @@ def get_weekly_stats(user_id: str):
         week_start = monday.isoformat()
 
     try:
-        # TODO: Implement TodoCheckinRepository for weekly stats
-        # For now, return empty stats
-        stats = {
-            'stats': {
-                'total_todos': 0,
-                'completed_todos': 0,
-                'in_progress_todos': 0,
-                'completion_rate': 0,
-                'daily_completion': {},
-                'category_breakdown': {}
-            }
-        }
-        return jsonify(stats)
+        with get_connection() as conn:
+            checkin_repo = TodoCheckinRepository(conn)
+            stats = checkin_repo.get_weekly_completion(user_id, week_start)
+            return jsonify(stats)
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
@@ -445,5 +437,263 @@ def batch_create_todos():
     except Exception as e:
         import traceback
         print(f"[batch_create_todos] Error: {e}")
+        print(traceback.format_exc())
+        return jsonify({'error': str(e)}), 500
+
+
+# ============================================================
+# Habit Logs API Endpoints
+# ============================================================
+
+@todos_bp.route('/<int:todo_id>/logs', methods=['GET'])
+def get_habit_logs(todo_id: int):
+    """
+    Get logs for a specific habit.
+
+    Args:
+        todo_id: Habit/Todo ID
+
+    Query Parameters:
+        start_date (str, optional): Start date (YYYY-MM-DD)
+        end_date (str, optional): End date (YYYY-MM-DD)
+        format (str, optional): Response format ('list' or 'dict', default: 'list')
+
+    Returns:
+        JSON: Habit logs
+    """
+    start_date = request.args.get('start_date')
+    end_date = request.args.get('end_date')
+    response_format = request.args.get('format', 'list')
+
+    try:
+        with get_connection() as conn:
+            logs_repo = HabitLogsRepository(conn)
+
+            if response_format == 'dict':
+                # Return as dictionary keyed by date (for frontend)
+                logs = logs_repo.get_logs_dict_for_habit(todo_id, start_date, end_date)
+            else:
+                # Return as list (default)
+                logs = logs_repo.get_logs_by_habit(todo_id, start_date, end_date)
+
+            return jsonify({'logs': logs})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@todos_bp.route('/<int:todo_id>/logs', methods=['POST'])
+def create_habit_log(todo_id: int):
+    """
+    Create or update a habit log entry.
+
+    Args:
+        todo_id: Habit/Todo ID
+
+    Request Body (JSON):
+        log_date (str, required): Log date (YYYY-MM-DD)
+        status (str, required): Status ('COMPLETED' or 'SKIPPED')
+        note (str, optional): Optional note
+
+    Returns:
+        JSON: Created/updated log
+    """
+    data = request.get_json()
+
+    if not data:
+        return jsonify({'error': 'Request body is required'}), 400
+
+    log_date = data.get('log_date')
+    status = data.get('status', 'COMPLETED')
+    note = data.get('note')
+
+    if not log_date:
+        return jsonify({'error': 'log_date is required'}), 400
+
+    if status not in ['COMPLETED', 'SKIPPED']:
+        return jsonify({'error': 'status must be COMPLETED or SKIPPED'}), 400
+
+    try:
+        with get_connection() as conn:
+            # Get the todo to get user_id
+            todo_repo = TodoRepository(conn)
+            todo = todo_repo.get_by_id(todo_id)
+
+            if not todo:
+                return jsonify({'error': 'Todo not found'}), 404
+
+            # Upsert the log
+            logs_repo = HabitLogsRepository(conn)
+            log_id = logs_repo.upsert(
+                habit_id=todo_id,
+                user_id=todo['user_id'],
+                log_date=log_date,
+                status=status,
+                note=note
+            )
+
+            # Get the created/updated log
+            log = logs_repo.get_by_habit_and_date(todo_id, log_date)
+
+            return jsonify({'log_id': log_id, 'log': log}), 201
+    except Exception as e:
+        import traceback
+        print(f"[create_habit_log] Error: {e}")
+        print(traceback.format_exc())
+        return jsonify({'error': str(e)}), 500
+
+
+@todos_bp.route('/<int:todo_id>/logs/<log_date>', methods=['DELETE'])
+def delete_habit_log(todo_id: int, log_date: str):
+    """
+    Delete a habit log entry.
+
+    Args:
+        todo_id: Habit/Todo ID
+        log_date: Log date (YYYY-MM-DD)
+
+    Returns:
+        JSON: Success message
+    """
+    try:
+        with get_connection() as conn:
+            logs_repo = HabitLogsRepository(conn)
+
+            # Check if log exists
+            existing_log = logs_repo.get_by_habit_and_date(todo_id, log_date)
+            if not existing_log:
+                return jsonify({'error': 'Log not found'}), 404
+
+            # Delete the log
+            success = logs_repo.delete(todo_id, log_date)
+
+            if not success:
+                return jsonify({'error': 'Failed to delete log'}), 500
+
+            return jsonify({'message': 'Log deleted successfully'})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@todos_bp.route('/<int:todo_id>/streak', methods=['GET'])
+def get_habit_streak(todo_id: int):
+    """
+    Get the current streak for a habit.
+
+    Args:
+        todo_id: Habit/Todo ID
+
+    Query Parameters:
+        as_of_date (str, optional): Calculate streak as of this date (YYYY-MM-DD)
+
+    Returns:
+        JSON: { "habit_id": 123, "streak": 7 }
+    """
+    as_of_date = request.args.get('as_of_date')
+
+    try:
+        with get_connection() as conn:
+            logs_repo = HabitLogsRepository(conn)
+            streak = logs_repo.calculate_streak(todo_id, as_of_date)
+
+            return jsonify({
+                'habit_id': todo_id,
+                'streak': streak
+            })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@todos_bp.route('/habits/<user_id>', methods=['GET'])
+def get_user_habits_with_logs(user_id: str):
+    """
+    Get all habits for a user with their logs.
+
+    This endpoint combines habit data with logs in the format expected by the frontend.
+
+    Query Parameters:
+        week_start (str, optional): Filter by week start date (YYYY-MM-DD)
+        start_date (str, optional): Start date for logs (YYYY-MM-DD, default: 30 days ago)
+        end_date (str, optional): End date for logs (YYYY-MM-DD, default: today)
+
+    Returns:
+        JSON: {
+            "habits": [
+                {
+                    "id": "1",
+                    "title": "...",
+                    "category": "NUTRITION",
+                    "emoji": "🥑",
+                    "frequency": 7,
+                    "logs": {
+                        "2025-01-15": { "status": "COMPLETED", "timestamp": 123456789 },
+                        ...
+                    },
+                    "streak": 5
+                }
+            ]
+        }
+    """
+    from datetime import datetime, timedelta
+
+    week_start = request.args.get('week_start')
+    start_date = request.args.get('start_date')
+    end_date = request.args.get('end_date')
+
+    # Default date range: last 30 days
+    if not end_date:
+        end_date = datetime.now().date().isoformat()
+    if not start_date:
+        start_date = (datetime.now().date() - timedelta(days=30)).isoformat()
+
+    try:
+        with get_connection() as conn:
+            todo_repo = TodoRepository(conn)
+            logs_repo = HabitLogsRepository(conn)
+
+            # Get user's todos (habits)
+            todos = todo_repo.get_by_user(user_id, week_start=week_start)
+
+            # Enrich each todo with logs and streak
+            habits = []
+            for todo in todos:
+                # Get logs as dictionary
+                logs = logs_repo.get_logs_dict_for_habit(
+                    habit_id=todo['id'],
+                    start_date=start_date,
+                    end_date=end_date
+                )
+
+                # Calculate streak
+                streak = logs_repo.calculate_streak(todo['id'])
+
+                # Map category to frontend format
+                category_map = {
+                    'diet': 'NUTRITION',
+                    'nutrition': 'NUTRITION',
+                    'exercise': 'EXERCISE',
+                    'sleep': 'SLEEP',
+                    'stress': 'MINDFULNESS',
+                    'mindfulness': 'MINDFULNESS',
+                    'medication': 'OTHER',
+                    'other': 'OTHER'
+                }
+
+                habit = {
+                    'id': str(todo['id']),
+                    'title': todo['title'],
+                    'description': todo.get('description'),
+                    'category': category_map.get(todo.get('category', 'other'), 'OTHER'),
+                    'logs': logs,
+                    'frequency': todo.get('frequency', 7),
+                    'streak': streak,
+                    'emoji': todo.get('emoji')
+                }
+
+                habits.append(habit)
+
+            return jsonify({'habits': habits})
+    except Exception as e:
+        import traceback
+        print(f"[get_user_habits_with_logs] Error: {e}")
         print(traceback.format_exc())
         return jsonify({'error': str(e)}), 500

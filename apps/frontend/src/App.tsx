@@ -19,6 +19,7 @@ import NotFound from "./pages/NotFound";
 const Overview = lazy(() => import("./pages/Overview"));
 const LearnMore = lazy(() => import("./pages/LearnMore"));
 const GoalTab = lazy(() => import("./pages/GoalTab").then(m => ({ default: m.GoalTab })));
+const GoalApp = lazy(() => import("./pages/goal/App"));
 const Coach = lazy(() => import("./pages/Coach"));
 const Profile = lazy(() => import("./pages/Profile"));
 const Community = lazy(() => import("./pages/Community"));
@@ -144,7 +145,8 @@ const App = () => {
                     <Route path="/coach/text" element={<TextChat />} />
                     <Route path="/olivia/call-results" element={<CallResultsPage />} />
                     <Route path="/icon-preview" element={<IconPreview />} />
-                    <Route path="/goal" element={<GoalTab />} />
+                    <Route path="/goal" element={<GoalApp />} />
+                    <Route path="/goal-old" element={<GoalTab />} />
                     <Route path="/learn-more" element={<LearnMoreOrGoalTab />} />
                     <Route path="/learn-more/olivia" element={<OliviaOverview />} />
                     <Route path="/learn-more/cgm-foundations" element={<CgmFoundations />} />

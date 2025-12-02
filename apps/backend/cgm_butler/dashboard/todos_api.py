@@ -388,6 +388,15 @@ def batch_create_todos():
 
     try:
         with get_connection() as conn:
+            # 验证 conversation_id 是否存在（如果提供了的话）
+            if conversation_id:
+                cursor = conn.cursor()
+                placeholder = '%s' if hasattr(conn, 'server_version') else '?'
+                cursor.execute(f'SELECT conversation_id FROM conversations WHERE conversation_id = {placeholder}', (conversation_id,))
+                if not cursor.fetchone():
+                    print(f"[batch_create_todos] Warning: conversation_id '{conversation_id}' not found in database, setting to NULL")
+                    conversation_id = None
+            
             todo_repo = TodoRepository(conn)
             created_todos = []
 

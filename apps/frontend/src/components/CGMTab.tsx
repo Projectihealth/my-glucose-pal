@@ -1,4 +1,4 @@
-import { ChevronDown, TrendingUp, Activity, Moon, Utensils, Plus, Check, Mic, Coffee, Apple, Dumbbell, Brain, MessageSquare, X, Send, Circle, Pencil, Trash2, Clock, Zap, History, ChevronRight, Sparkles } from 'lucide-react';
+import { ChevronDown, TrendingUp, TrendingDown, Activity, Moon, Utensils, Plus, Check, Mic, Coffee, Apple, Dumbbell, Brain, MessageSquare, X, Send, Circle, Pencil, Trash2, Clock, Zap, History, ChevronRight, Sparkles } from 'lucide-react';
 import { useState, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
@@ -7,7 +7,7 @@ import { TabHeader } from './TabHeader';
 
 interface PatternWithAction {
   id: string;
-  type: 'spike' | 'drop' | 'stable';
+  type: 'spike' | 'drop' | 'stable' | 'low' | 'variability';
   timeRange: string;
   description: string;
   icon: any;
@@ -52,26 +52,31 @@ interface CGMTabProps {
 // Generate realistic CGM data for 24 hours based on date
 const generateCGMDataForDate = (date: string): CGMDataPoint[] => {
   const data: CGMDataPoint[] = [];
-  const hours = ['00:00', '01:00', '02:00', '03:00', '04:00', '05:00', '06:00', '07:00', 
+  const hours = ['00:00', '01:00', '02:00', '03:00', '04:00', '05:00', '06:00', '07:00',
                  '08:00', '09:00', '10:00', '11:00', '12:00', '13:00', '14:00', '15:00',
                  '16:00', '17:00', '18:00', '19:00', '20:00', '21:00', '22:00', '23:59'];
-  
-  // Current hour simulation (14:00 = 2 PM as "now")
-  const currentHourIndex = 14;
-  
+
   // Different CGM patterns for different dates
   let values: number[];
-  
-  if (date === 'Nov 17, 2025') {
-    // Nov 17: 更健康的一天 - 早餐吃低GI食物，午餐后运动，晚餐适中
-    values = [88, 85, 82, 80, 85, 95, 115, 130, 148, 155, 145, 135, 
+  let currentHourIndex: number;
+
+  if (date === 'Dec 1') {
+    // Dec 1: Full day - healthy eating day with low GI breakfast, exercise after lunch, moderate dinner
+    values = [88, 85, 82, 80, 85, 95, 115, 130, 148, 155, 145, 135,
               155, 170, 160, 145, 130, 120, 145, 160, 150, 135, 115, 95];
-  } else {
-    // Nov 18: 默认数据 - 早餐蜂蜜燕麦（高GI），午餐沙拉（低GI），晚餐后散步
-    values = [95, 92, 88, 85, 90, 110, 145, 180, 210, 195, 165, 140, 
+    currentHourIndex = 23; // Full 24 hours available
+  } else if (date === 'Dec 2') {
+    // Dec 2: Full day - honey oatmeal breakfast (high GI), salad lunch (low GI), evening walk after dinner
+    values = [95, 92, 88, 85, 90, 110, 145, 180, 210, 195, 165, 140,
               160, 175, 155, 140, 135, 145, 170, 190, 165, 140, 120, 105];
+    currentHourIndex = 23; // Full 24 hours available
+  } else {
+    // Dec 3: Current day - partial data (up to 2 PM)
+    values = [90, 87, 84, 82, 88, 105, 135, 165, 190, 175, 150, 135,
+              150, 165, 155, 145, 135, 145, 165, 180, 160, 145, 125, 110];
+    currentHourIndex = 14; // Only show data up to 2 PM
   }
-  
+
   hours.forEach((time, index) => {
     data.push({
       time,
@@ -80,16 +85,16 @@ const generateCGMDataForDate = (date: string): CGMDataPoint[] => {
       hour: index
     });
   });
-  
+
   return data;
 };
 
 // Get events for specific date
 const getEventsForDate = (date: string): LogEvent[] => {
-  if (date === 'Nov 17, 2025') {
+  if (date === 'Dec 1') {
     return [
       {
-        id: 'nov17-1',
+        id: 'dec1-1',
         type: 'meal',
         mealType: 'breakfast',
         description: 'Greek yogurt with whole grain granola',
@@ -100,18 +105,18 @@ const getEventsForDate = (date: string): LogEvent[] => {
         bgColor: '#FFF0F5',
       },
       {
-        id: 'nov17-2',
+        id: 'dec1-2',
         type: 'meal',
         mealType: 'lunch',
         description: 'Quinoa bowl with grilled vegetables',
-        time: '12:00',
-        hour: 12,
+        time: '11:00',
+        hour: 11,
         icon: Utensils,
         color: '#5B7FF3',
         bgColor: '#EEF2FF',
       },
       {
-        id: 'nov17-3',
+        id: 'dec1-3',
         type: 'activity',
         description: '45 min gym workout',
         time: '14:00',
@@ -121,44 +126,54 @@ const getEventsForDate = (date: string): LogEvent[] => {
         bgColor: '#F0FDF9',
       },
       {
-        id: 'nov17-4',
+        id: 'dec1-4',
         type: 'meal',
         mealType: 'dinner',
         description: 'Baked salmon with brown rice',
-        time: '18:00',
-        hour: 18,
+        time: '17:00',
+        hour: 17,
         icon: Utensils,
         color: '#5B7FF3',
         bgColor: '#EEF2FF',
       },
     ];
-  } else {
-    // Nov 18 events
+  } else if (date === 'Dec 2') {
     return [
       {
-        id: '1',
+        id: 'dec2-1',
         type: 'meal',
         mealType: 'breakfast',
         description: 'Oatmeal with berries and honey',
-        time: '08:00',
-        hour: 8,
+        time: '07:00',
+        hour: 7,
         icon: Coffee,
         color: '#FF6B9D',
         bgColor: '#FFF0F5',
       },
       {
-        id: '2',
+        id: 'dec2-2',
         type: 'meal',
         mealType: 'lunch',
         description: 'Grilled chicken salad',
-        time: '12:00',
-        hour: 12,
+        time: '11:00',
+        hour: 11,
         icon: Utensils,
         color: '#5B7FF3',
         bgColor: '#EEF2FF',
       },
       {
-        id: '3',
+        id: 'dec2-3',
+        type: 'meal',
+        mealType: 'dinner',
+        description: 'Pasta with marinara sauce',
+        time: '17:00',
+        hour: 17,
+        icon: Utensils,
+        color: '#5B7FF3',
+        bgColor: '#EEF2FF',
+      },
+      {
+        id: 'dec2-4',
         type: 'activity',
         description: '30 min evening walk',
         time: '18:00',
@@ -166,6 +181,32 @@ const getEventsForDate = (date: string): LogEvent[] => {
         icon: Dumbbell,
         color: '#00D492',
         bgColor: '#F0FDF9',
+      },
+    ];
+  } else {
+    // Dec 3 events (current day)
+    return [
+      {
+        id: 'dec3-1',
+        type: 'meal',
+        mealType: 'breakfast',
+        description: 'Scrambled eggs with avocado toast',
+        time: '07:00',
+        hour: 7,
+        icon: Coffee,
+        color: '#FF6B9D',
+        bgColor: '#FFF0F5',
+      },
+      {
+        id: 'dec3-2',
+        type: 'meal',
+        mealType: 'lunch',
+        description: 'Turkey sandwich with side salad',
+        time: '11:00',
+        hour: 11,
+        icon: Utensils,
+        color: '#5B7FF3',
+        bgColor: '#EEF2FF',
       },
     ];
   }
@@ -290,10 +331,10 @@ const generateGlucoseProjections = (
 };
 
 export function CGMTab({}: CGMTabProps = {}) {
-  const [currentDate, setCurrentDate] = useState('Nov 18, 2025');
+  const [currentDate, setCurrentDate] = useState('Dec 3');
   const [showPatterns, setShowPatterns] = useState(false);
   const [showLogModal, setShowLogModal] = useState(false);
-  const [cgmData, setCgmData] = useState<CGMDataPoint[]>(generateCGMDataForDate('Nov 18, 2025'));
+  const [cgmData, setCgmData] = useState<CGMDataPoint[]>(generateCGMDataForDate('Dec 3'));
   const [isRecording, setIsRecording] = useState(false);
   const [inputMode, setInputMode] = useState<'voice' | 'text'>('voice');
   const [recordingTimer, setRecordingTimer] = useState(0);
@@ -302,8 +343,8 @@ export function CGMTab({}: CGMTabProps = {}) {
   const [editingEvent, setEditingEvent] = useState<LogEvent | null>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState<string | null>(null);
   const [expandedPatterns, setExpandedPatterns] = useState<{ [key: string]: boolean }>({});
-  
-  const [logEvents, setLogEvents] = useState<LogEvent[]>(getEventsForDate('Nov 18, 2025'));
+
+  const [logEvents, setLogEvents] = useState<LogEvent[]>(getEventsForDate('Dec 3'));
   
   // Form state
   const [selectedEventType, setSelectedEventType] = useState<'meal' | 'activity' | 'stress' | 'sleep'>('meal');
@@ -324,7 +365,7 @@ export function CGMTab({}: CGMTabProps = {}) {
       suggestedAction: {
         id: 'action-1',
         title: 'Eat protein-rich breakfast',
-        description: 'Add protein to stabilize morning glucose',
+        description: 'Add eggs or Greek yogurt to stabilize morning glucose',
         targetCount: 5,
         category: 'diet',
         icon: Utensils,
@@ -355,6 +396,60 @@ export function CGMTab({}: CGMTabProps = {}) {
         targetCount: 4,
         category: 'exercise',
         icon: Dumbbell,
+        isAddedToGoals: false,
+      }
+    },
+    {
+      id: '4',
+      type: 'low',
+      timeRange: '03:00 - 04:00',
+      description: 'Nighttime glucose dip detected',
+      icon: TrendingDown,
+      color: '#F59E0B',
+      bgColor: '#FFF7ED',
+      suggestedAction: {
+        id: 'action-3',
+        title: 'Small bedtime snack',
+        description: 'Have a small protein-fat snack before bed to prevent overnight lows',
+        targetCount: 3,
+        category: 'diet',
+        icon: Moon,
+        isAddedToGoals: false,
+      }
+    },
+    {
+      id: '5',
+      type: 'variability',
+      timeRange: '15:00 - 17:00',
+      description: 'High glucose variability in afternoon',
+      icon: Activity,
+      color: '#8B5CF6',
+      bgColor: '#F5F3FF',
+      suggestedAction: {
+        id: 'action-4',
+        title: 'Schedule regular snack time',
+        description: 'Have a consistent afternoon snack to reduce glucose swings',
+        targetCount: 5,
+        category: 'diet',
+        icon: Clock,
+        isAddedToGoals: false,
+      }
+    },
+    {
+      id: '6',
+      type: 'drop',
+      timeRange: '14:00 - 15:00',
+      description: 'Post-exercise glucose drop',
+      icon: TrendingDown,
+      color: '#06B6D4',
+      bgColor: '#ECFEFF',
+      suggestedAction: {
+        id: 'action-5',
+        title: 'Pre-workout carbs',
+        description: 'Eat 15-20g carbs before exercise to prevent lows',
+        targetCount: 4,
+        category: 'exercise',
+        icon: Sparkles,
         isAddedToGoals: false,
       }
     },
@@ -413,7 +508,16 @@ export function CGMTab({}: CGMTabProps = {}) {
 
   // Handle date change
   const handleDateChange = (direction: 'prev' | 'next') => {
-    const newDate = direction === 'prev' ? 'Nov 17, 2025' : 'Nov 18, 2025';
+    let newDate: string;
+    if (direction === 'prev') {
+      if (currentDate === 'Dec 3') newDate = 'Dec 2';
+      else if (currentDate === 'Dec 2') newDate = 'Dec 1';
+      else newDate = 'Dec 1';
+    } else {
+      if (currentDate === 'Dec 1') newDate = 'Dec 2';
+      else if (currentDate === 'Dec 2') newDate = 'Dec 3';
+      else newDate = 'Dec 3';
+    }
     setCurrentDate(newDate);
     setCgmData(generateCGMDataForDate(newDate));
     setLogEvents(getEventsForDate(newDate));
@@ -547,9 +651,9 @@ export function CGMTab({}: CGMTabProps = {}) {
 
         <div className="px-6 pb-8">
           <div className="flex items-center justify-between mb-6">
-            <button 
+            <button
               onClick={() => handleDateChange('prev')}
-              disabled={currentDate === 'Nov 17, 2025'}
+              disabled={currentDate === 'Dec 1'}
               className="text-gray-400 text-sm px-3 py-2 hover:bg-gray-50 rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
             >
               Previous day
@@ -557,9 +661,9 @@ export function CGMTab({}: CGMTabProps = {}) {
             <div className="text-gray-900" style={{ fontSize: '15px', fontWeight: 600 }}>
               {currentDate}
             </div>
-            <button 
+            <button
               onClick={() => handleDateChange('next')}
-              disabled={currentDate === 'Nov 18, 2025'}
+              disabled={currentDate === 'Dec 3'}
               className="text-gray-400 text-sm px-3 py-2 hover:bg-gray-50 rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
             >
               Next day
@@ -662,8 +766,19 @@ export function CGMTab({}: CGMTabProps = {}) {
                   cursor={{ stroke: '#5B7FF3', strokeWidth: 1 }} 
                 />
 
+                {/* Actual glucose - CGM data (Area with gradient fill) */}
+                <Area
+                  type="monotone"
+                  dataKey="value"
+                  stroke="#5B7FF3"
+                  strokeWidth={2.5}
+                  fill="url(#mainGradient)"
+                  dot={false}
+                  activeDot={{ r: 5, fill: '#5B7FF3', stroke: 'white', strokeWidth: 2 }}
+                />
+
                 {/* Meal Predicted - Individualized NN (Red dashed line) */}
-                <Line 
+                <Line
                   type="monotone"
                   dataKey="mealPredicted"
                   stroke="#EF4444"
@@ -671,16 +786,6 @@ export function CGMTab({}: CGMTabProps = {}) {
                   strokeDasharray="5 5"
                   dot={false}
                   connectNulls
-                />
-
-                {/* Actual glucose - CGM data (Solid blue line) */}
-                <Line 
-                  type="monotone" 
-                  dataKey="value" 
-                  stroke="#5B7FF3" 
-                  strokeWidth={2.5}
-                  dot={false}
-                  activeDot={{ r: 5, fill: '#5B7FF3', stroke: 'white', strokeWidth: 2 }}
                 />
               </AreaChart>
             </ResponsiveContainer>
@@ -1016,7 +1121,8 @@ export function CGMTab({}: CGMTabProps = {}) {
         whileHover={{ scale: 1.05 }}
         whileTap={{ scale: 0.95 }}
         onClick={openLogModal}
-        className="fixed bottom-28 right-6 w-14 h-14 bg-gradient-to-br from-[#5B7FF3] to-[#7B9FF9] rounded-full shadow-lg flex items-center justify-center z-50"
+        className="fixed right-6 w-14 h-14 bg-gradient-to-br from-[#5B7FF3] to-[#7B9FF9] rounded-full shadow-lg flex items-center justify-center z-50"
+        style={{ top: '75%', maxWidth: '390px', marginRight: 'calc((100vw - min(420px, 100vw)) / 2 + 24px)' }}
       >
         <Plus className="w-6 h-6 text-white" />
       </motion.button>
@@ -1033,14 +1139,14 @@ export function CGMTab({}: CGMTabProps = {}) {
                 setShowLogModal(false);
                 setEditingEvent(null);
               }}
-              className="fixed inset-0 bg-black/40 z-50"
+              className="absolute inset-0 bg-black/40 z-50"
             />
 
             <motion.div
               initial={{ opacity: 0, y: 100 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: 100 }}
-              className="fixed bottom-0 left-0 right-0 bg-white rounded-t-[32px] z-50 max-h-[90vh] overflow-y-auto"
+              className="absolute bottom-0 left-0 right-0 bg-white rounded-t-[32px] z-50 max-h-[90vh] overflow-y-auto"
             >
               <div className="p-6 pb-8">
                 {/* Header */}

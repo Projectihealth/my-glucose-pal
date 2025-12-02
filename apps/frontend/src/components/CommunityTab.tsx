@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Heart, MessageCircle, Share2, Plus, Filter, TrendingUp, Bookmark, Play, BookOpen, Headphones, Video, Clock, CheckCircle2, Users, Sparkles, ChevronRight, X, Send, Image as ImageIcon, Smile } from 'lucide-react';
 import { toast } from 'sonner';
 import { TabHeader } from './TabHeader';
+import { useNavigate } from 'react-router-dom';
 
 type MainTab = 'feed' | 'resources';
 type FeedFilter = 'all' | 'following' | 'popular';
@@ -192,6 +193,7 @@ const mockResources: Resource[] = [
 ];
 
 export function CommunityTab() {
+  const navigate = useNavigate();
   const [mainTab, setMainTab] = useState<MainTab>('feed');
   const [feedFilter, setFeedFilter] = useState<FeedFilter>('all');
   const [resourceType, setResourceType] = useState<ResourceType>('all');
@@ -321,10 +323,24 @@ export function CommunityTab() {
   })();
 
   const filteredResources = resources.filter(resource => {
-    const typeMatch = resourceType === 'all' || resource.type === resourceType;
+    const typeMatch = resourceType === 'all' || resource.type === resourceType.slice(0, -1) as 'article' | 'podcast' | 'video';
     const categoryMatch = resourceCategory === 'all' || resource.category === resourceCategory;
     return typeMatch && categoryMatch;
   });
+
+  const handleResourceClick = (resource: Resource) => {
+    // Navigate to specific articles
+    if (resource.id === 'a1') {
+      navigate('/learn-more/user-guide');
+    } else if (resource.id === 'a2') {
+      navigate('/learn-more/cgm-foundations');
+    } else if (resource.id === 'a3') {
+      navigate('/learn-more/weight-loss');
+    } else {
+      // For other resources, show a toast (placeholder for future implementation)
+      toast.info('This resource is coming soon!');
+    }
+  };
 
   const getResourceTypeIcon = (type: 'article' | 'podcast' | 'video') => {
     switch (type) {
@@ -344,7 +360,7 @@ export function CommunityTab() {
         <TabHeader
           eyebrow="Community"
           title="Share Your Journey"
-          subtitle="Real wins from people just like you"
+          subtitle="Learn more about how to achieve your goal"
           className="pb-4"
         />
 
@@ -361,7 +377,7 @@ export function CommunityTab() {
             style={{ fontWeight: 600 }}
           >
             <Users className="w-4 h-4 inline mr-1.5" />
-            Feed
+            Community Feed
           </button>
           <button
             onClick={() => setMainTab('resources')}
@@ -680,6 +696,7 @@ export function CommunityTab() {
                 key={resource.id}
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
+                onClick={() => handleResourceClick(resource)}
                 className="bg-white rounded-3xl border border-gray-100 shadow-sm p-5 hover:shadow-md transition-all cursor-pointer group"
               >
                 <div className="flex items-start gap-4">
@@ -796,7 +813,8 @@ export function CommunityTab() {
           whileHover={{ scale: 1.05 }}
           whileTap={{ scale: 0.95 }}
           onClick={() => setShowCreatePost(true)}
-          className="fixed bottom-28 right-6 w-14 h-14 bg-gradient-to-br from-[#5B7FF3] to-[#7B9FF9] rounded-full shadow-lg flex items-center justify-center z-50"
+          className="fixed right-6 w-14 h-14 bg-gradient-to-br from-[#5B7FF3] to-[#7B9FF9] rounded-full shadow-lg flex items-center justify-center z-50"
+          style={{ top: '75%', maxWidth: '390px', marginRight: 'calc((100vw - min(420px, 100vw)) / 2 + 24px)' }}
         >
           <Plus className="w-6 h-6 text-white" />
         </motion.button>

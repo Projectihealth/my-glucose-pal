@@ -1482,8 +1482,25 @@ function GoalsEditor({
 }
 
 function createDefaultProfile(overrides: Partial<UserProfile> = {}): UserProfile {
+  // Check localStorage for onboarding data first
+  const onboardingData = localStorage.getItem('userProfile');
+  let baseProfile = DEFAULT_PROFILE;
+
+  if (onboardingData) {
+    try {
+      const parsed = JSON.parse(onboardingData);
+      // Merge onboarding data with defaults, prioritizing onboarding data
+      baseProfile = {
+        ...DEFAULT_PROFILE,
+        ...parsed,
+      };
+    } catch (error) {
+      console.warn('Failed to parse onboarding data from localStorage:', error);
+    }
+  }
+
   return {
-    ...DEFAULT_PROFILE,
+    ...baseProfile,
     ...overrides,
   };
 }

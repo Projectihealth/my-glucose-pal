@@ -237,7 +237,7 @@ export function NudgeNotification({ onComplete, onDismiss, testMode = false }: N
   if (nudgeState === 'minimized-left' || nudgeState === 'minimized-right') {
     return (
       <motion.div
-        className="fixed z-50"
+        className="absolute z-50"
         style={{
           top: y,
           left: nudgeState === 'minimized-left' ? 0 : 'auto',
@@ -325,7 +325,7 @@ export function NudgeNotification({ onComplete, onDismiss, testMode = false }: N
     <AnimatePresence>
       {nudgeState === 'expanded' && (
         <motion.div
-          className="fixed top-0 left-0 right-0 z-50 flex justify-center px-4 pt-4"
+          className="absolute top-0 left-0 right-0 z-50 flex justify-center px-4 pt-4"
           style={{ maxWidth: '390px', margin: '0 auto' }}
           initial={{ y: -200, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}

@@ -1122,7 +1122,7 @@ export function CGMTab({}: CGMTabProps = {}) {
         whileTap={{ scale: 0.95 }}
         onClick={openLogModal}
         className="fixed right-6 w-14 h-14 bg-gradient-to-br from-[#5B7FF3] to-[#7B9FF9] rounded-full shadow-lg flex items-center justify-center z-50"
-        style={{ top: '75%', maxWidth: '390px', marginRight: 'calc((100vw - min(420px, 100vw)) / 2 + 24px)' }}
+        style={{ top: '75%' }}
       >
         <Plus className="w-6 h-6 text-white" />
       </motion.button>

@@ -246,3 +246,18 @@ export async function getWeeklyStats(
   const data = await response.json();
   return data as WeeklyStats;
 }
+
+/**
+ * Get todos by conversation ID
+ */
+export async function getTodosByConversation(conversationId: string): Promise<Todo[]> {
+  const url = `${API_BASE_URL}/api/todos/by-conversation/${conversationId}`;
+  const response = await fetch(url);
+
+  if (!response.ok) {
+    throw new Error(`Failed to fetch todos by conversation: ${response.statusText}`);
+  }
+
+  const data = await response.json();
+  return data.todos as Todo[];
+}

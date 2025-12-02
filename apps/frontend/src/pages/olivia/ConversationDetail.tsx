@@ -1,5 +1,5 @@
 import { useNavigate, useParams } from 'react-router-dom';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   ChevronLeft,
@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import { useConversationDetail } from '../../hooks/useConversations';
 import type { ConversationDetail as ConversationDetailType } from '../../services/conversationsApi';
+import { getTodosByConversation, type Todo } from '../../services/todosApi';
 
 interface Message {
   id: string;
@@ -242,12 +243,32 @@ function extractActionItems(extractedData: any, conversationIcon: string, conver
   return items;
 }
 
-function ConversationDetailContent({ conversation, onBack }: {
+function ConversationDetailContent({ conversation, onBack, conversationId }: {
   conversation: ProcessedConversationData;
   onBack: () => void;
+  conversationId: string;
 }) {
   const [showTranscript, setShowTranscript] = useState(false);
   const [isSummaryExpanded, setIsSummaryExpanded] = useState(false);
+  const [savedTodos, setSavedTodos] = useState<Todo[]>([]);
+  const [loadingTodos, setLoadingTodos] = useState(true);
+  
+  // Load saved todos for this conversation
+  useEffect(() => {
+    const loadTodos = async () => {
+      try {
+        setLoadingTodos(true);
+        const todos = await getTodosByConversation(conversationId);
+        setSavedTodos(todos);
+      } catch (error) {
+        console.error('Failed to load todos:', error);
+      } finally {
+        setLoadingTodos(false);
+      }
+    };
+    
+    loadTodos();
+  }, [conversationId]);
   
   // Parse summary into bullet points if it contains bullet characters
   const parseSummary = (summary: string): { isBulletFormat: boolean; bullets: string[]; text: string } => {
@@ -391,8 +412,8 @@ function ConversationDetailContent({ conversation, onBack }: {
             )}
           </motion.div>
 
-          {/* Action Items Card */}
-          {conversation.actionItems && conversation.actionItems.length > 0 && (
+          {/* Saved Todos Card - Show user's actual saved todos */}
+          {!loadingTodos && savedTodos.length > 0 && (
             <motion.div
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
@@ -404,9 +425,77 @@ function ConversationDetailContent({ conversation, onBack }: {
                   <CheckCircle2 className="w-4 h-4 text-white" />
                 </div>
                 <h3 className="text-gray-900" style={{ fontSize: '17px', fontWeight: 600 }}>
-                  Goals Created
+                  Habits You're Tracking
                 </h3>
                 <span className="ml-auto px-2.5 py-0.5 bg-blue-100 text-[#5B7FF3] rounded-full text-xs" style={{ fontWeight: 600 }}>
+                  {savedTodos.length}
+                </span>
+              </div>
+
+              <div className="space-y-2.5">
+                {savedTodos.map((todo, index) => {
+                  const CategoryIcon = getCategoryIcon(todo.category);
+
+                  return (
+                    <motion.div
+                      key={todo.id}
+                      initial={{ opacity: 0, x: -10 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ delay: 0.1 + index * 0.05 }}
+                      className="bg-gray-50 rounded-2xl p-3.5 border border-gray-100"
+                    >
+                      <div className="flex items-start gap-3">
+                        <div className="w-9 h-9 rounded-xl bg-white border border-gray-200 flex items-center justify-center flex-shrink-0">
+                          <CategoryIcon className="w-4 h-4 text-gray-600" />
+                        </div>
+
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-start justify-between gap-2 mb-1.5">
+                            <h4 className="text-gray-900 text-sm" style={{ fontWeight: 600 }}>
+                              {todo.title}
+                            </h4>
+                            <div className="flex items-center gap-1 flex-shrink-0">
+                              <Target className="w-3 h-3 text-gray-400" />
+                              <span className="text-xs text-gray-600" style={{ fontWeight: 600 }}>
+                                {todo.target_count}x/week
+                              </span>
+                            </div>
+                          </div>
+                          {todo.health_benefit && (
+                            <p className="text-xs text-gray-600 leading-relaxed">
+                              {todo.health_benefit}
+                            </p>
+                          )}
+                          {todo.time_description && (
+                            <p className="text-xs text-gray-500 mt-1">
+                              ⏰ {todo.time_description}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    </motion.div>
+                  );
+                })}
+              </div>
+            </motion.div>
+          )}
+          
+          {/* Show AI suggestions if no saved todos yet */}
+          {!loadingTodos && savedTodos.length === 0 && conversation.actionItems && conversation.actionItems.length > 0 && (
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.05 }}
+              className="bg-white rounded-3xl p-5 border border-gray-100 shadow-sm"
+            >
+              <div className="flex items-center gap-2 mb-4">
+                <div className="w-6 h-6 rounded-lg bg-[#5B7FF3] flex items-center justify-center flex-shrink-0">
+                  <Sparkles className="w-4 h-4 text-white" />
+                </div>
+                <h3 className="text-gray-900" style={{ fontSize: '17px', fontWeight: 600 }}>
+                  AI Suggestions
+                </h3>
+                <span className="ml-auto px-2.5 py-0.5 bg-gray-100 text-gray-600 rounded-full text-xs" style={{ fontWeight: 600 }}>
                   {conversation.actionItems.length}
                 </span>
               </div>
@@ -664,6 +753,7 @@ function ConversationDetail() {
   return (
     <ConversationDetailContent
       conversation={processedConversation}
+      conversationId={conversation.id}
       onBack={() => navigate('/coach')}
     />
   );

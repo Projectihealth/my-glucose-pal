@@ -169,16 +169,24 @@ async def get_user_memory_context(user_id: str) -> Dict[str, Any]:
         }
 
 
-def format_memory_for_prompt(memory_context: Dict[str, Any]) -> str:
+def format_memory_for_prompt(memory_context: Dict[str, Any], current_datetime: datetime = None) -> str:
     """
-    将 memory context 格式化为适合放入 prompt 的文本
+    将 memory context 格式化为适合放入 prompt 的文本，包含相对时间信息
 
     Args:
         memory_context: 从 get_user_memory_context 返回的 context
+        current_datetime: 当前时间（datetime 对象），用于计算相对时间
 
     Returns:
-        格式化的文本字符串
+        格式化的文本字符串，包含时间戳
     """
+    import pytz
+
+    # 如果没有提供当前时间，使用 PST 当前时间
+    if current_datetime is None:
+        pacific_tz = pytz.timezone('America/Los_Angeles')
+        current_datetime = datetime.now(pacific_tz)
+
     parts = []
 
     # Long-term memory
@@ -210,13 +218,57 @@ def format_memory_for_prompt(memory_context: Dict[str, Any]) -> str:
             except:
                 pass
 
-    # Recent memories
+    # Recent memories with relative time
     recent = memory_context.get("recent_memories", [])
     if recent:
         parts.append("\n=== RECENT CONVERSATIONS ===")
-        for i, mem in enumerate(recent[:3], 1):
+        for i, mem in enumerate(recent[:5], 1):
+            # 计算相对时间
+            time_label = ""
+            if mem.get("created_at"):
+                try:
+                    # 解析记忆的时间戳
+                    mem_time = mem["created_at"]
+                    if isinstance(mem_time, str):
+                        mem_time = datetime.fromisoformat(mem_time.replace('Z', '+00:00'))
+
+                    # 确保两个时间都是 aware datetime
+                    if mem_time.tzinfo is None:
+                        pacific_tz = pytz.timezone('America/Los_Angeles')
+                        mem_time = pacific_tz.localize(mem_time)
+                    if current_datetime.tzinfo is None:
+                        pacific_tz = pytz.timezone('America/Los_Angeles')
+                        current_datetime = pacific_tz.localize(current_datetime)
+
+                    # 计算时间差
+                    time_diff = current_datetime - mem_time
+                    days_ago = time_diff.days
+
+                    # 格式化日期
+                    date_str = mem_time.strftime("%b %d, %Y")
+
+                    # 生成相对时间标签
+                    if days_ago == 0:
+                        time_label = f"[Today - {date_str}]"
+                    elif days_ago == 1:
+                        time_label = f"[Yesterday - {date_str}]"
+                    elif days_ago < 7:
+                        time_label = f"[{days_ago} days ago - {date_str}]"
+                    elif days_ago < 14:
+                        time_label = f"[Last week - {date_str}]"
+                    else:
+                        weeks_ago = days_ago // 7
+                        time_label = f"[{weeks_ago} weeks ago - {date_str}]"
+                except Exception as e:
+                    logger.warning(f"Failed to parse memory timestamp: {e}")
+                    time_label = ""
+
+            # 格式化记忆内容
             if mem.get("summary"):
-                parts.append(f"{i}. {mem['summary']}")
+                if time_label:
+                    parts.append(f"{time_label} {mem['summary']}")
+                else:
+                    parts.append(f"{i}. {mem['summary']}")
             if mem.get("insights"):
                 parts.append(f"   Insights: {mem['insights']}")
 
@@ -286,12 +338,26 @@ async def create_intake_web_call(
 
         logger.info(f"==== Onboarding: stage={onboarding_stage}, score={completion_score}, engagement={engagement_stage}")
 
-        # 步骤 4: 获取用户的 memory context
+        # 步骤 4: 获取当前时间信息（用于 time awareness 和 memory formatting）
+        from datetime import datetime
+        import pytz
+
+        # 使用 PST/PDT 时区
+        pacific_tz = pytz.timezone('America/Los_Angeles')
+        now = datetime.now(pacific_tz)
+
+        current_date = now.strftime("%A, %B %d, %Y")  # "Monday, December 02, 2025"
+        current_time = now.strftime("%I:%M %p %Z")     # "02:30 PM PST"
+        current_day_of_week = now.strftime("%A")       # "Monday"
+
+        logger.info(f"==== Current time: {current_date} {current_time}")
+
+        # 步骤 4.5: 获取用户的 memory context（使用当前时间计算相对时间）
         logger.info(f"==== Fetching memory context for user_id: {user_id}")
         memory_context = await get_user_memory_context(user_id)
-        memory_text = format_memory_for_prompt(memory_context)
+        memory_text = format_memory_for_prompt(memory_context, current_datetime=now)
 
-        # 步骤 5: 构建 Retell 动态变量（包含 memory context + onboarding info）
+        # 步骤 5: 构建 Retell 动态变量（包含 memory context + onboarding info + time info）
         llm_dynamic_variables = {
             "user_name": user_name,
             "user_age": str(age),
@@ -302,6 +368,10 @@ async def create_intake_web_call(
             "onboarding_stage": onboarding_stage,  # ⭐ Onboarding stage
             "completion_score": str(completion_score),  # ⭐ Completion score
             "is_new_user": "true" if onboarding_stage in ['not_started', 'in_progress'] and completion_score < 80 else "false",
+            # ⭐ Time awareness variables
+            "current_date": current_date,  # e.g., "Monday, December 02, 2025"
+            "current_time": current_time,  # e.g., "02:30 PM PST"
+            "current_day_of_week": current_day_of_week,  # e.g., "Monday"
         }
 
         logger.info(f"==== Dynamic variables: user_name={user_name}, onboarding_stage={onboarding_stage}, is_new_user={llm_dynamic_variables['is_new_user']}")

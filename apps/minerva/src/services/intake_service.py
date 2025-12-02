@@ -46,8 +46,13 @@ INTAKE_LLM_ID = os.getenv("INTAKE_LLM_ID", "llm_e54c307ce74090cdfd06f682523b")
 CGM_BACKEND_URL = os.getenv("CGM_BACKEND_URL", "http://localhost:5000")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 
-# 获取 prompts 目录
-PROMPTS_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "prompts")
+# 获取 prompts 目录（正确路径：src/routers/intake_phone_agent/prompts/）
+PROMPTS_DIR = os.path.join(
+    os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+    "routers",
+    "intake_phone_agent",
+    "prompts"
+)
 OLIVIA_PROMPT_PATH = os.path.join(PROMPTS_DIR, "olivia_coach_prompt.txt")
 BEGIN_MESSAGE_PATH = os.path.join(PROMPTS_DIR, "begin_message.txt")
 
@@ -368,11 +373,14 @@ async def update_llm_settings(settings: Dict[str, Any]) -> Dict[str, Any]:
         
         retell = get_retell_client()
         
-        update_params = {"general_prompt": general_prompt}
-        
+        update_params = {
+            "general_prompt": general_prompt,
+            "start_speaker": "agent"  # Required parameter: who speaks first
+        }
+
         if settings.get('begin_message'):
             update_params["begin_message"] = settings['begin_message']
-        
+
         response = retell.llm.update(llm_id=llm_id, **update_params)
         
         logger.info(f"==== LLM settings updated successfully for llm_id: {llm_id}")

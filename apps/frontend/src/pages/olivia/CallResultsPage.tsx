@@ -362,7 +362,7 @@ export function CallResultsPage() {
             </div>
 
             {/* Todo List */}
-            <div className="space-y-3">
+            <div className="space-y-3 pb-28">
               {todos.map(todo => (
                 <TodoItemCard
                   key={todo.id}

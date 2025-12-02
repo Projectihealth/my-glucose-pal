@@ -450,6 +450,48 @@ def batch_create_todos():
         return jsonify({'error': str(e)}), 500
 
 
+@todos_bp.route('/by-conversation/<conversation_id>', methods=['GET'])
+def get_todos_by_conversation(conversation_id: str):
+    """
+    Get todos associated with a specific conversation.
+    
+    Args:
+        conversation_id: Conversation ID
+    
+    Returns:
+        JSON: List of todos created from this conversation
+    """
+    try:
+        with get_connection() as conn:
+            cursor = conn.cursor()
+            
+            # Query todos by conversation_id
+            placeholder = '%s' if hasattr(conn, 'server_version') else '?'
+            cursor.execute(f'''
+                SELECT * FROM user_todos 
+                WHERE conversation_id = {placeholder}
+                ORDER BY created_at DESC
+            ''', (conversation_id,))
+            
+            todos = cursor.fetchall()
+            
+            # Parse JSON fields
+            todo_repo = TodoRepository(conn)
+            parsed_todos = [todo_repo._parse_json_fields(todo) for todo in todos]
+            
+            return jsonify({
+                'conversation_id': conversation_id,
+                'count': len(parsed_todos),
+                'todos': parsed_todos
+            }), 200
+            
+    except Exception as e:
+        import traceback
+        print(f"[get_todos_by_conversation] Error: {e}")
+        print(traceback.format_exc())
+        return jsonify({'error': str(e)}), 500
+
+
 # ============================================================
 # Habit Logs API Endpoints
 # ============================================================

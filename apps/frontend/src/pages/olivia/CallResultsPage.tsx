@@ -156,7 +156,7 @@ export function CallResultsPage() {
   };
 
   const handleBack = () => {
-    navigate(-1);
+    navigate('/olivia', { replace: true });
   };
 
   const getCategoryIcon = (category: TodoWithSelection['category']) => {
@@ -223,9 +223,9 @@ export function CallResultsPage() {
       </div>
 
       {/* Content */}
-      <div className="flex-1 overflow-hidden">
+      <div className="flex-1 overflow-hidden relative">
         <ScrollArea className="h-full">
-          <div className="px-4 py-5 space-y-5 pb-24">
+          <div className="px-4 py-5 space-y-5 pb-32">
             {/* Summary Card - Collapsible */}
             {summary && (
               <div className="bg-white rounded-3xl shadow-sm overflow-hidden">
@@ -271,21 +271,46 @@ export function CallResultsPage() {
                     >
                       <div>
                         <h4 className="text-sm text-gray-700 mb-3">Overview</h4>
-                        {/* Support bullet point format */}
-                        {summary.overview.includes('•') ? (
-                          <ul className="space-y-2.5">
-                            {summary.overview.split('•').filter(b => b.trim()).map((bullet, index) => (
-                              <li key={index} className="flex gap-2.5 text-sm text-gray-600 leading-relaxed">
-                                <span className="text-[#5B7FF3] flex-shrink-0 mt-0.5">•</span>
-                                <span className="flex-1">{bullet.trim()}</span>
-                              </li>
-                            ))}
-                          </ul>
-                        ) : (
-                          <p className="text-sm text-gray-600 leading-relaxed">
-                            {summary.overview}
-                          </p>
-                        )}
+                        {/* Robust bullet point support:
+                            - LLM often returns a multiline string with lines starting with "• "
+                            - Sometimes bullets are separated only by spaces or newlines
+                            We normalize by splitting on newlines first, then on "•",
+                            and treat it as bullets if we get more than one non‑empty item. */}
+                        {(() => {
+                          // Ensure raw is always a string
+                          const raw = typeof summary.overview === 'string' ? summary.overview : String(summary.overview || '');
+                          const bulletCandidates = raw
+                            .split('\n')
+                            .flatMap(line => line.split('•'))
+                            .map(b => b.trim())
+                            .filter(Boolean);
+
+                          const isBulletOverview = bulletCandidates.length > 1;
+
+                          if (!isBulletOverview) {
+                            return (
+                              <p className="text-sm text-gray-600 leading-relaxed">
+                                {raw}
+                              </p>
+                            );
+                          }
+
+                          return (
+                            <ul className="space-y-2.5">
+                              {bulletCandidates.map((bullet, index) => (
+                                <li
+                                  key={index}
+                                  className="flex gap-2.5 text-sm text-gray-600 leading-relaxed"
+                                >
+                                  <span className="text-[#5B7FF3] flex-shrink-0 mt-0.5">
+                                    •
+                                  </span>
+                                  <span className="flex-1">{bullet}</span>
+                                </li>
+                              ))}
+                            </ul>
+                          );
+                        })()}
                       </div>
 
                       {summary.key_findings.length > 0 && (
@@ -357,29 +382,29 @@ export function CallResultsPage() {
                 <p>No action items generated from this conversation.</p>
               </div>
             )}
-
-            {/* Bottom Floating Action Bar */}
-            {todos.length > 0 && (
-              <div className="fixed bottom-4 left-1/2 -translate-x-1/2 w-[358px] bg-white rounded-2xl p-4 shadow-lg border border-gray-100">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-xs text-gray-500 mb-0.5">Selected habits</p>
-                    <p className="text-gray-800">
-                      {todos.filter(t => t.selected).length} of {todos.length}
-                    </p>
-                  </div>
-                  <button
-                    className="bg-[#5B7FF3] text-white px-6 py-2.5 rounded-full hover:bg-[#4A6FE2] active:scale-95 transition-all shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
-                    onClick={handleConfirm}
-                    disabled={submitting || todos.filter(t => t.selected).length === 0}
-                  >
-                    {submitting ? 'Saving...' : 'Confirm'}
-                  </button>
-                </div>
-              </div>
-            )}
           </div>
         </ScrollArea>
+
+        {/* Bottom Floating Action Bar - Outside ScrollArea */}
+        {todos.length > 0 && (
+          <div className="absolute bottom-20 left-1/2 -translate-x-1/2 w-[358px] bg-white rounded-2xl p-4 shadow-lg border border-gray-100 z-10">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-xs text-gray-500 mb-0.5">Selected habits</p>
+                <p className="text-gray-800">
+                  {todos.filter(t => t.selected).length} of {todos.length}
+                </p>
+              </div>
+              <button
+                className="bg-[#5B7FF3] text-white px-6 py-2.5 rounded-full hover:bg-[#4A6FE2] active:scale-95 transition-all shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                onClick={handleConfirm}
+                disabled={submitting || todos.filter(t => t.selected).length === 0}
+              >
+                {submitting ? 'Saving...' : 'Confirm'}
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

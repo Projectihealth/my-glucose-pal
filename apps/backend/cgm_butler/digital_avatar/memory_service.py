@@ -155,6 +155,8 @@ class MemoryService:
             
         except Exception as e:
             print(f"❌ MemoryService 处理失败: {e}")
+            import traceback
+            traceback.print_exc()
             self.db_conn.rollback()
             return {
                 'success': False,
@@ -279,6 +281,19 @@ Return only JSON, no other text."""
                 'extracted_data': {}
             }
     
+    def _sanitize_for_json(self, data: Any) -> Any:
+        """
+        清理数据以便 JSON 序列化，转换 datetime 对象为字符串
+        """
+        if isinstance(data, dict):
+            return {k: self._sanitize_for_json(v) for k, v in data.items()}
+        elif isinstance(data, list):
+            return [self._sanitize_for_json(item) for item in data]
+        elif isinstance(data, datetime):
+            return data.isoformat()
+        else:
+            return data
+    
     def _extract_long_term_updates(self, transcript: Any, user_id: str) -> Dict[str, Any]:
         """
         从对话中提取长期记忆更新
@@ -298,10 +313,13 @@ Return only JSON, no other text."""
         if not transcript_text.strip():
             return {}
         
+        # 清理 existing_memory 中的 datetime 对象
+        sanitized_memory = self._sanitize_for_json(existing_memory or {})
+        
         prompt = f"""Analyze the following conversation and determine if it contains information about the user's long-term habits, goals, preferences, etc.
 
 Existing long-term memory:
-{json.dumps(existing_memory or {}, ensure_ascii=False, indent=2)}
+{json.dumps(sanitized_memory, ensure_ascii=False, indent=2)}
 
 Current conversation:
 {transcript_text}

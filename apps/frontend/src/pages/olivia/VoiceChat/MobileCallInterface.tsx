@@ -204,8 +204,9 @@ export function MobileCallInterface({ onBack, onCallEnded }: MobileCallInterface
           >
             <div className="w-32 h-32 rounded-full overflow-hidden border-4 border-white/20 shadow-2xl">
               <ImageWithFallback
-                src="https://img.freepik.com/premium-photo/friendly-professional-handsome-male-doctor-portrait-picture-medical-hospital-doctor_969759-4074.jpg"
-                alt="Health Coach"
+                // Image file is located at: apps/frontend/public/images/olivia-nurse.png
+                src="/images/olivia-nurse.png"
+                alt="Olivia - Your CGM Nurse Coach"
                 className="w-full h-full object-cover"
               />
             </div>

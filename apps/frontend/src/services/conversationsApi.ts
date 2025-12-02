@@ -89,3 +89,19 @@ export async function getConversationDetail(
   const data = await response.json();
   return data.conversation;
 }
+
+/**
+ * Delete a conversation
+ */
+export async function deleteConversation(conversationId: string): Promise<void> {
+  const response = await fetch(
+    `${API_BASE_URL}/api/conversations/${conversationId}`,
+    {
+      method: 'DELETE',
+    }
+  );
+
+  if (!response.ok) {
+    throw new Error(`Failed to delete conversation: ${response.statusText}`);
+  }
+}

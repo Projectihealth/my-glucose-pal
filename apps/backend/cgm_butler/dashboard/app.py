@@ -923,6 +923,50 @@ def get_conversation_detail(conversation_id):
         return jsonify({'error': str(e)}), 500
 
 
+@app.route('/api/conversations/<conversation_id>', methods=['DELETE'])
+def delete_conversation(conversation_id):
+    """
+    Delete a conversation and all associated data
+    This will cascade delete:
+    - user_memories (summary, insights, etc.)
+    - conversation_analysis
+    - user_todos (set conversation_id to NULL due to ON DELETE SET NULL)
+    """
+    try:
+        with get_connection() as conn:
+            cursor = conn.cursor()
+            
+            # Check if conversation exists
+            from shared.database.repositories.conversation_repository import ConversationRepository
+            conv_repo = ConversationRepository(conn)
+            conversation = conv_repo.get_by_id(conversation_id)
+            
+            if not conversation:
+                return jsonify({'error': 'Conversation not found'}), 404
+            
+            # Delete conversation (CASCADE will handle related records)
+            placeholder = '%s' if hasattr(conn, 'server_version') else '?'
+            cursor.execute(f'''
+                DELETE FROM conversations 
+                WHERE conversation_id = {placeholder}
+            ''', (conversation_id,))
+            
+            conn.commit()
+            
+            print(f"✅ Deleted conversation: {conversation_id}")
+            
+            return jsonify({
+                'message': 'Conversation deleted successfully',
+                'conversation_id': conversation_id
+            }), 200
+            
+    except Exception as e:
+        import traceback
+        print(f"Error deleting conversation: {e}")
+        print(traceback.format_exc())
+        return jsonify({'error': str(e)}), 500
+
+
 if __name__ == '__main__':
     print("\n" + "="*60)
     print("🚀 CGM Butler Dashboard 启动中...")

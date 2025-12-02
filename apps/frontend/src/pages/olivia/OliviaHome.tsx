@@ -1,10 +1,12 @@
 import { useNavigate } from 'react-router-dom';
-import { useState, useEffect, useMemo } from 'react';
-import { Mic, Video, MessageCircle, Sparkles, ChevronDown, ChevronUp } from 'lucide-react';
+import { useState, useEffect, useMemo, useRef } from 'react';
+import { Mic, Video, MessageCircle, Sparkles, ChevronDown, ChevronUp, Trash2 } from 'lucide-react';
 import { processConversations } from '../../utils/conversationHelpers';
 import { getStoredUserId, USER_ID_CHANGE_EVENT } from '@/utils/userUtils';
 import { useConversationHistory, usePrefetchConversationDetail } from '../../hooks/useConversations';
 import { TabHeader } from '@/components/TabHeader';
+import { deleteConversation } from '../../services/conversationsApi';
+import { useQueryClient } from '@tanstack/react-query';
 
 function OliviaHome() {
   const navigate = useNavigate();
@@ -33,6 +35,7 @@ function OliviaTab({ onNavigate }: { onNavigate: (view: 'voice' | 'video' | 'tex
   const [showChatModal, setShowChatModal] = useState(false);
   const [showAllHistory, setShowAllHistory] = useState(false);
   const [activeUserId, setActiveUserId] = useState(() => getStoredUserId());
+  const queryClient = useQueryClient();
   
   // Use React Query hook for conversation history (with caching)
   const { data, isLoading, error } = useConversationHistory(activeUserId, 10);
@@ -43,6 +46,21 @@ function OliviaTab({ onNavigate }: { onNavigate: (view: 'voice' | 'video' | 'tex
     if (!data?.conversations) return [];
     return processConversations(data.conversations);
   }, [data]);
+
+  // Handle conversation deletion
+  const handleDeleteConversation = async (conversationId: string) => {
+    try {
+      await deleteConversation(conversationId);
+      
+      // Invalidate and refetch conversation history
+      queryClient.invalidateQueries({ queryKey: ['conversationHistory', activeUserId] });
+      
+      console.log(`✅ Deleted conversation: ${conversationId}`);
+    } catch (error) {
+      console.error('Failed to delete conversation:', error);
+      alert('Failed to delete conversation. Please try again.');
+    }
+  };
 
   // Listen for user changes
   useEffect(() => {
@@ -154,6 +172,7 @@ function OliviaTab({ onNavigate }: { onNavigate: (view: 'voice' | 'video' | 'tex
                   conversation={conversation}
                   onNavigate={onNavigate}
                   onPrefetch={prefetchDetail}
+                  onDelete={handleDeleteConversation}
                 />
               ))}
             </div>
@@ -233,14 +252,28 @@ function ConversationCard({
   conversation,
   onNavigate,
   onPrefetch,
+  onDelete,
 }: {
   conversation: ProcessedConversation;
   onNavigate: (view: 'voice' | 'video' | 'text') => void;
   onPrefetch?: (conversationId: string) => void;
+  onDelete?: (conversationId: string) => void;
 }) {
   const navigate = useNavigate();
+  
+  // Swipe State
+  const [swipeOffset, setSwipeOffset] = useState(0);
+  const offsetRef = useRef(0);
+  const startX = useRef<number | null>(null);
+  const isDragging = useRef(false);
+  const cardRef = useRef<HTMLDivElement>(null);
 
   const handleClick = () => {
+    // If swiped open, tap closes it
+    if (Math.abs(swipeOffset) > 10) {
+      resetSwipe();
+      return;
+    }
     // Navigate to conversation detail page
     navigate(`/coach/conversation/${conversation.id}`);
   };
@@ -252,17 +285,109 @@ function ConversationCard({
     }
   };
 
+  // --- SWIPE LOGIC ---
+  const updateOffset = (val: number) => {
+    offsetRef.current = val;
+    setSwipeOffset(val);
+  };
+
+  const resetSwipe = () => {
+    updateOffset(0);
+  };
+
+  const handleDragStart = (clientX: number) => {
+    startX.current = clientX;
+    isDragging.current = false;
+  };
+
+  const handleDragMove = (clientX: number) => {
+    if (startX.current === null) return;
+    const diff = clientX - startX.current;
+    if (Math.abs(diff) > 5) isDragging.current = true;
+
+    if (isDragging.current) {
+      // Only allow left swipe (negative values) for delete
+      const constrainedDiff = Math.max(-100, Math.min(0, diff));
+      updateOffset(constrainedDiff);
+    }
+  };
+
+  const handleDragEnd = () => {
+    // Snap logic
+    if (offsetRef.current < -50) {
+      // Snap to Delete (Left)
+      updateOffset(-80);
+    } else {
+      // Reset
+      updateOffset(0);
+    }
+    startX.current = null;
+  };
+
+  const handleTouchStart = (e: React.TouchEvent) => handleDragStart(e.touches[0].clientX);
+  const handleTouchMove = (e: React.TouchEvent) => handleDragMove(e.touches[0].clientX);
+  const handleTouchEnd = () => handleDragEnd();
+
+  const handleMouseDown = (e: React.MouseEvent) => {
+    if (e.button === 0) handleDragStart(e.clientX);
+  };
+
+  const handleMouseMove = (e: React.MouseEvent) => {
+    if (startX.current !== null && e.buttons === 1) {
+      e.preventDefault();
+      handleDragMove(e.clientX);
+    }
+  };
+
+  const handleMouseUp = () => handleDragEnd();
+  const handleMouseLeave = () => {
+    if (startX.current !== null) handleDragEnd();
+  };
+
+  const handleDelete = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (window.confirm("Delete this conversation? This action cannot be undone.")) {
+      if (onDelete) {
+        onDelete(conversation.id);
+      }
+    } else {
+      resetSwipe();
+    }
+  };
+
   return (
-    <button
-      onClick={handleClick}
-      onMouseEnter={handleMouseEnter}
-      className="w-full group opacity-0 animate-fade-in"
-      style={{
-        animation: 'fadeIn 0.5s ease-out forwards',
-      }}
-    >
-      <div className="bg-white rounded-2xl p-4 border border-gray-100 shadow-sm hover:shadow-md hover:border-[#5B7FF3]/30 transition-all duration-200 active:scale-[0.98]">
-        <div className="flex items-start gap-3.5">
+    <div className="relative overflow-hidden rounded-2xl group w-full">
+      {/* Background Action Layer: DELETE (Left Swipe / Right Side) */}
+      <div className="absolute inset-y-0 right-0 w-24 bg-red-50 flex items-center justify-end rounded-r-2xl z-0">
+        <button 
+          onClick={handleDelete}
+          className="flex flex-col items-center justify-center text-red-500 p-2 w-full h-full hover:bg-red-100 transition-colors cursor-pointer"
+        >
+          <Trash2 className="w-5 h-5 mb-1" />
+          <span className="text-[10px] font-bold uppercase">Delete</span>
+        </button>
+      </div>
+
+      {/* Main Card Content */}
+      <button
+        ref={cardRef}
+        onClick={handleClick}
+        onMouseEnter={handleMouseEnter}
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
+        onMouseDown={handleMouseDown}
+        onMouseMove={handleMouseMove}
+        onMouseUp={handleMouseUp}
+        onMouseLeave={handleMouseLeave}
+        className="w-full opacity-0 animate-fade-in relative z-10 transition-transform duration-300 ease-out select-none"
+        style={{
+          animation: 'fadeIn 0.5s ease-out forwards',
+          transform: `translateX(${swipeOffset}px)`,
+        }}
+      >
+        <div className="bg-white rounded-2xl p-4 border border-gray-100 shadow-sm hover:shadow-md hover:border-[#5B7FF3]/30 transition-all duration-200 active:scale-[0.98]">
+          <div className="flex items-start gap-3.5">
           {/* Icon - Emoji with soft gradient background */}
           <div className="flex flex-col items-center gap-1.5 min-w-[60px] pt-0.5">
             <div
@@ -317,8 +442,8 @@ function ConversationCard({
             )}
           </div>
         </div>
-      </div>
-    </button>
+      </button>
+    </div>
   );
 }
 

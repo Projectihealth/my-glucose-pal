@@ -27,7 +27,7 @@ export function useConversationHistory(userId: string, limit: number = 10) {
   return useQuery({
     queryKey: conversationKeys.list(userId, limit),
     queryFn: () => getConversationHistory(userId, limit),
-    staleTime: 2 * 60 * 1000, // 2分钟内不重新请求
+    staleTime: 30 * 1000, // 30秒内不重新请求（降低缓存时间以便更快看到新对话）
     gcTime: 10 * 60 * 1000, // 10分钟后清除缓存
     enabled: !!userId,
   });

@@ -662,37 +662,37 @@ def get_conversation_history(user_id):
 
             # 使用 ConversationRepository 而不是原始SQL
             from shared.database.repositories.conversation_repository import ConversationRepository
+            from shared.database.repositories.memory_repository import MemoryRepository
+            
             conv_repo = ConversationRepository(conn)
+            mem_repo = MemoryRepository(conn)
             
-            # 获取用户的对话列表（包含 summary）
-            conversations_data = conv_repo.get_user_conversations(user_id, limit=limit)
+            # 🔧 修复：先获取有有效 summary 的对话，然后取最近的 N 条
+            # 而不是先取最近 N 条，再过滤（这样会漏掉有效对话）
+            placeholder = mem_repo.placeholder
+            cursor.execute(f'''
+                SELECT c.*, m.summary, m.insights, m.key_topics, m.extracted_data
+                FROM conversations c
+                INNER JOIN user_memories m ON c.conversation_id = m.conversation_id
+                WHERE c.user_id = {placeholder}
+                AND LENGTH(m.summary) >= 40
+                ORDER BY c.started_at DESC
+                LIMIT {placeholder}
+            ''', (user_id, limit))
             
-            # ⚡ 性能优化：一次性获取所有对话的memories，避免N+1查询问题
-            conversation_ids = [conv['conversation_id'] for conv in conversations_data]
+            conversations_data = cursor.fetchall()
+            
+            # 构建 memory_map（为了保持后续代码兼容）
             memory_map = {}
-            
-            if conversation_ids:
-                try:
-                    from shared.database.repositories.memory_repository import MemoryRepository
-                    mem_repo = MemoryRepository(conn)
-                    
-                    # 一次性查询所有相关的memories
-                    placeholders = ', '.join([mem_repo.placeholder] * len(conversation_ids))
-                    query = f'''
-                        SELECT * FROM user_memories 
-                        WHERE conversation_id IN ({placeholders})
-                    '''
-                    mem_repo.execute(query, tuple(conversation_ids))
-                    memories = mem_repo.cursor.fetchall()
-                    
-                    # 构建conversation_id -> memory的映射
-                    for mem in memories:
-                        mem_dict = mem_repo._dict_from_row(mem)
-                        conv_id = mem_dict.get('conversation_id')
-                        if conv_id:
-                            memory_map[conv_id] = mem_dict
-                except Exception as e:
-                    print(f"Warning: Failed to get memories: {e}")
+            for conv in conversations_data:
+                conv_id = conv.get('conversation_id')
+                if conv_id:
+                    memory_map[conv_id] = {
+                        'summary': conv.get('summary'),
+                        'insights': conv.get('insights'),
+                        'key_topics': conv.get('key_topics'),
+                        'extracted_data': conv.get('extracted_data'),
+                    }
             
             conversations = []
             for conv in conversations_data:

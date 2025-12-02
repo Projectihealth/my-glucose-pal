@@ -35,7 +35,7 @@ export const HabitCard: React.FC<HabitCardProps> = ({ habit, onToggle, onDelete,
   
   // History Modal State
   const [showHistory, setShowHistory] = useState(false);
-  
+
   // Swipe State
   const [swipeOffset, setSwipeOffset] = useState(0);
   const offsetRef = useRef(0);
@@ -111,14 +111,14 @@ export const HabitCard: React.FC<HabitCardProps> = ({ habit, onToggle, onDelete,
   const handleMouseDown = (e: React.MouseEvent) => {
       if (e.button === 0) handleDragStart(e.clientX);
   };
-  
+
   const handleMouseMove = (e: React.MouseEvent) => {
     if (startX.current !== null && e.buttons === 1) {
         e.preventDefault();
         handleDragMove(e.clientX);
     }
   };
-  
+
   const handleMouseUp = () => handleDragEnd();
   const handleMouseLeave = () => {
       if (startX.current !== null) handleDragEnd();
@@ -147,7 +147,7 @@ export const HabitCard: React.FC<HabitCardProps> = ({ habit, onToggle, onDelete,
 
       {/* Background Action Layer: EDIT (Right Swipe / Left Side) */}
       <div className="absolute inset-y-0 left-0 w-1/2 bg-blue-50 flex items-center justify-start rounded-l-3xl z-0">
-          <button 
+        <button
             onClick={(e) => {
                 e.stopPropagation();
                 onEdit(habit);
@@ -167,7 +167,7 @@ export const HabitCard: React.FC<HabitCardProps> = ({ habit, onToggle, onDelete,
               relative z-10 w-full p-4 
               border transition-transform duration-300 ease-out select-none
               bg-white
-              ${isCompletedToday 
+            ${isCompletedToday
                   ? 'border-slate-100' // Clean look for completed
                   : 'border-slate-100 shadow-sm hover:shadow-md hover:border-slate-200'}
           `}
@@ -216,19 +216,19 @@ export const HabitCard: React.FC<HabitCardProps> = ({ habit, onToggle, onDelete,
           <div className={`flex-1 min-w-0 cursor-pointer transition-opacity duration-300 ${isCompletedToday ? 'opacity-50' : 'opacity-100'}`}>
               <div className="flex justify-between items-start">
                   <div className="flex items-center gap-2">
-                    {habit.emoji && (
+            {habit.emoji && (
                         <span className="text-lg leading-none">{habit.emoji}</span>
-                    )}
+            )}
                     <h3 className={`font-semibold text-base leading-tight transition-all duration-300 ${isCompletedToday ? 'text-slate-500 line-through decoration-slate-300' : 'text-slate-700'}`}>
-                        {habit.title}
-                    </h3>
+              {habit.title}
+            </h3>
                   </div>
-              </div>
-              
+          </div>
+
               {/* COMPACT: reduced mb-3 to mb-2 */}
               <p className="text-sm mt-1 mb-2 font-medium text-slate-500 leading-snug">
-                  {habit.description}
-              </p>
+            {habit.description}
+          </p>
 
               {/* Footer Metadata */}
               <div className="flex items-center justify-between">
@@ -246,27 +246,27 @@ export const HabitCard: React.FC<HabitCardProps> = ({ habit, onToggle, onDelete,
                               {todaysLog.photo && (
                                   <div className="w-6 h-6 rounded-lg bg-blue-50 text-blue-500 flex items-center justify-center border border-blue-100">
                                       <CameraIcon className="w-3 h-3" />
-                                  </div>
-                              )}
+              </div>
+            )}
                               {todaysLog.audio && (
                                   <div className="w-6 h-6 rounded-lg bg-purple-50 text-purple-500 flex items-center justify-center border border-purple-100">
                                       <MicIcon className="w-3 h-3" />
-                                  </div>
+            </div>
                               )}
                               {todaysLog.note && (
                                   <div className="w-6 h-6 rounded-lg bg-slate-50 text-slate-400 flex items-center justify-center border border-slate-200">
                                       <PaperclipIcon className="w-3 h-3" />
-                                  </div>
+          </div>
                               )}
                               {todaysLog.status === 'PARTIAL' && (
                                   <div className="px-1.5 py-0.5 rounded-md bg-amber-50 border border-amber-100 text-[9px] font-bold text-amber-600 flex items-center">
                                       PARTIAL
-                                  </div>
-                              )}
-                          </div>
-                      )}
-                  </div>
-                   
+                </div>
+              )}
+                </div>
+              )}
+            </div>
+
                    {/* Weekly Progress Visualization - COMPACT: reduced gap */}
                    <div 
                       className="flex flex-col items-end gap-1 pl-4 border-l border-slate-100 cursor-help ml-2"
@@ -276,11 +276,11 @@ export const HabitCard: React.FC<HabitCardProps> = ({ habit, onToggle, onDelete,
                       }}
                    >
                        <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider leading-none">
-                           This Week
-                       </span>
-                       <div className="flex items-center gap-0.5">
+                This Week
+              </span>
+              <div className="flex items-center gap-0.5">
                            {Array.from({ length: targetFrequency }).map((_, i) => (
-                               <div 
+                  <div
                                   key={i} 
                                   className={`
                                     h-1.5 w-3 rounded-full transition-all duration-500
@@ -288,21 +288,21 @@ export const HabitCard: React.FC<HabitCardProps> = ({ habit, onToggle, onDelete,
                                         ? 'bg-blue-500 shadow-[0_0_4px_rgba(59,130,246,0.4)]' 
                                         : 'bg-slate-200'}
                                   `}
-                               />
-                           ))}
-                       </div>
-                   </div>
+                  />
+                ))}
               </div>
+            </div>
           </div>
+        </div>
         </div>
       </div>
 
       {/* History Modal */}
       {showHistory && (
-        <div 
+        <div
             className="absolute inset-0 z-50 flex items-center justify-center bg-white/95 backdrop-blur-sm rounded-3xl animate-in fade-in duration-200"
-            onClick={(e) => {
-                e.stopPropagation();
+          onClick={(e) => {
+            e.stopPropagation();
                 setShowHistory(false);
             }}
         >

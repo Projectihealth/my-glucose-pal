@@ -1,6 +1,6 @@
 import { useNavigate } from 'react-router-dom';
 import { useState, useEffect, useMemo } from 'react';
-import { Mic, Video, MessageCircle, Sparkles } from 'lucide-react';
+import { Mic, Video, MessageCircle, Sparkles, ChevronDown, ChevronUp } from 'lucide-react';
 import { processConversations } from '../../utils/conversationHelpers';
 import { getStoredUserId, USER_ID_CHANGE_EVENT } from '@/utils/userUtils';
 import { useConversationHistory, usePrefetchConversationDetail } from '../../hooks/useConversations';
@@ -111,10 +111,16 @@ function OliviaTab({ onNavigate }: { onNavigate: (view: 'voice' | 'video' | 'tex
             {conversationHistory.length > 2 && (
               <button
                 onClick={() => setShowAllHistory(!showAllHistory)}
-                className="text-[#5B7FF3] text-sm hover:underline"
-                style={{ fontWeight: 500 }}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white border border-gray-200 hover:border-[#5B7FF3] hover:bg-[#5B7FF3]/5 active:scale-95 transition-all duration-200 shadow-sm"
               >
-                {showAllHistory ? 'Show Less' : 'View All'}
+                <span className="text-[#5B7FF3] text-sm" style={{ fontWeight: 600 }}>
+                  {showAllHistory ? 'Show Less' : `View All (${conversationHistory.length})`}
+                </span>
+                {showAllHistory ? (
+                  <ChevronUp className="w-4 h-4 text-[#5B7FF3]" />
+                ) : (
+                  <ChevronDown className="w-4 h-4 text-[#5B7FF3]" />
+                )}
               </button>
             )}
           </div>

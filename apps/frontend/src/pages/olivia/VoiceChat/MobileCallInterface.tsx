@@ -231,7 +231,7 @@ export function MobileCallInterface({ onBack, onCallEnded }: MobileCallInterface
         {/* Session Title */}
         <div className="text-center mb-8">
           <div className="text-lg text-white/90">Care Assistant</div>
-          <div className="text-sm text-gray-400 mt-1">Nutrition & Lifestyle Intake</div>
+          <div className="text-sm text-gray-400 mt-1">Daily Check-in</div>
         </div>
 
         {/* Live Caption - Current Message */}

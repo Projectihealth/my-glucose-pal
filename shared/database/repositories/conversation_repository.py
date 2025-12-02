@@ -19,6 +19,37 @@ class ConversationRepository(BaseRepository):
     # ============================================================
     # Save Methods
     # ============================================================
+
+    # NOTE: MySQL expects DATETIME in 'YYYY-MM-DD HH:MM:SS' format.
+    # Retell / Tavus often send ISO 8601 strings like '2025-12-02T18:06:45.421Z'.
+    # This helper normalizes various timestamp formats into a DB‑friendly string.
+    def _normalize_timestamp_for_db(self, ts: Optional[str]) -> Optional[str]:
+        """Normalize ISO8601 / arbitrary timestamp strings for MySQL/SQLite DATETIME columns.
+
+        - Accepts ISO 8601 with `Z` or timezone offset
+        - Returns `YYYY-MM-DD HH:MM:SS` (no timezone, no milliseconds)
+        - If parsing fails, returns the original value so existing data isn't broken
+        """
+        if not ts:
+            return None
+
+        # If it's already in a common SQL format (contains a space and no 'T'),
+        # we assume it's safe to store as-is.
+        if isinstance(ts, str) and " " in ts and "T" not in ts:
+            return ts
+
+        try:
+            s = str(ts).strip()
+            # Handle trailing 'Z' (UTC) by converting to +00:00
+            if s.endswith("Z"):
+                s = s.replace("Z", "+00:00")
+            # datetime.fromisoformat supports `YYYY-MM-DDTHH:MM:SS[.ffffff][+HH:MM]`
+            dt = datetime.fromisoformat(s)
+            # Format without timezone / milliseconds for MySQL DATETIME
+            return dt.strftime("%Y-%m-%d %H:%M:%S")
+        except Exception:
+            # Fallback: return original string; DB will error if it truly can't store it
+            return ts
     
     def save_tavus_conversation(
         self,
@@ -84,6 +115,10 @@ class ConversationRepository(BaseRepository):
     ) -> str:
         """Save Retell voice conversation."""
         conversation_id = str(uuid.uuid4())
+
+        # Normalize timestamps for DB compatibility (especially MySQL)
+        started_at_db = self._normalize_timestamp_for_db(started_at)
+        ended_at_db = self._normalize_timestamp_for_db(ended_at)
         
         self.execute('''
         INSERT INTO conversations (
@@ -97,7 +132,7 @@ class ConversationRepository(BaseRepository):
         ''', (
             conversation_id, user_id, 'retell_voice', f'Voice Call - {retell_call_id[:10]}',
             retell_call_id, retell_agent_id, call_status, call_type,
-            started_at, ended_at, duration_seconds,
+            started_at_db, ended_at_db, duration_seconds,
             self._serialize_json_for_db(call_cost or {}),
             disconnection_reason,
             transcript,

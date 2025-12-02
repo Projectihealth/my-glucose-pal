@@ -441,6 +441,7 @@ function ConversationCard({
               </div>
             )}
           </div>
+          </div>
         </div>
       </button>
     </div>

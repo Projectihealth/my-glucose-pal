@@ -343,7 +343,11 @@ function generateConciseSummary(fullSummary: string, extractedData: Record<strin
 function formatDate(dateString: string): string {
   const date = new Date(dateString);
   const now = new Date();
-  const diffDays = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60 * 24));
+  
+  // Use local date comparison (ignore time) to avoid timezone issues
+  const dateOnly = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+  const nowOnly = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const diffDays = Math.floor((nowOnly.getTime() - dateOnly.getTime()) / (1000 * 60 * 60 * 24));
 
   if (diffDays === 0) {
     return 'Today';

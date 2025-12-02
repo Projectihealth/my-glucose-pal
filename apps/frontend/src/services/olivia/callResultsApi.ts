@@ -5,7 +5,17 @@
 
 import axios from 'axios';
 
-const MINERVA_BASE_URL = import.meta.env.VITE_MINERVA_BASE_URL || 'http://localhost:8000';
+// 与 retellService 保持一致：
+// - 本地开发：使用相对路径 `/intake/...`，交给 Vite 代理到 Minerva (8000)
+// - 线上部署：通过 VITE_MINERVA_BASE_URL 指向 Minerva 的公开地址
+const isLocalhost =
+  typeof window !== 'undefined' &&
+  (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+
+const MINERVA_BASE_URL =
+  !isLocalhost && import.meta.env.VITE_MINERVA_BASE_URL
+    ? import.meta.env.VITE_MINERVA_BASE_URL
+    : '';
 const BACKEND_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
 
 export interface ConversationSummary {

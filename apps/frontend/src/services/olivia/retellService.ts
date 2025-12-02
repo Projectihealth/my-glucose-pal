@@ -6,8 +6,16 @@
 import axios from 'axios';
 import type { WebCallResponse, TranscriptMessage, CallSummary, GoalAnalysis } from '../../types/olivia/retell';
 
-// 使用空字符串作为默认值，这样请求会走相对路径，被 Vite 代理到后端
-const MINERVA_BACKEND_URL = import.meta.env.VITE_MINERVA_BACKEND_URL || '';
+// 本地开发（localhost / 127.0.0.1）时，使用相对路径，让 Vite 代理到 Minerva (8000)
+// 部署环境下，通过 VITE_MINERVA_BACKEND_URL 显式指定 Minerva 后端地址
+const isLocalhost =
+  typeof window !== 'undefined' &&
+  (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+
+const MINERVA_BACKEND_URL =
+  !isLocalhost && import.meta.env.VITE_MINERVA_BACKEND_URL
+    ? import.meta.env.VITE_MINERVA_BACKEND_URL
+    : '';
 
 /**
  * 创建 Web Call

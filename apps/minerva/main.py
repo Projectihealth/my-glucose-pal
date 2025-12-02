@@ -30,7 +30,9 @@ app = FastAPI(
 )
 
 # 配置 CORS
-cors_origins = os.getenv("CORS_ORIGINS", "http://localhost:5173,http://localhost:3000").split(",")
+# 默认允许常见本地开发端口；可通过 CORS_ORIGINS 覆盖
+default_origins = "http://localhost:5173,http://localhost:3000,http://localhost:8080"
+cors_origins = os.getenv("CORS_ORIGINS", default_origins).split(",")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=cors_origins,

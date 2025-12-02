@@ -4,7 +4,7 @@ import { MobileCallInterface } from './MobileCallInterface';
 function VoiceChat() {
   const navigate = useNavigate();
 
-  const handleCallEnded = (endedCallId: string | null, endedTranscript: any[]) => {
+  const handleCallEnded = (endedCallId: string | null, endedTranscript: any[], durationSeconds: number) => {
     // Navigate to CallResultsPage with state
     // Note: We need to get conversationId and durationSeconds from the call
     // For now, using callId as conversationId (will be set by backend in saveCallData response)
@@ -12,7 +12,7 @@ function VoiceChat() {
       state: {
         conversationId: endedCallId || 'unknown',
         transcript: endedTranscript,
-        durationSeconds: 0, // TODO: Pass actual duration from MobileCallInterface
+        durationSeconds: durationSeconds || 0,
       },
     });
   };

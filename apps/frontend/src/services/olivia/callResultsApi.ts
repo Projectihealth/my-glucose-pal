@@ -5,7 +5,7 @@
 
 import axios from 'axios';
 
-const MINERVA_BASE_URL = import.meta.env.VITE_MINERVA_BASE_URL || 'http://localhost:8001';
+const MINERVA_BASE_URL = import.meta.env.VITE_MINERVA_BASE_URL || 'http://localhost:8000';
 const BACKEND_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
 
 export interface ConversationSummary {

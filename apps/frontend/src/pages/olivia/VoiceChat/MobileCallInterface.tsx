@@ -16,7 +16,7 @@ import { getStoredUserId } from '@/utils/userUtils';
 
 interface MobileCallInterfaceProps {
   onBack: () => void;
-  onCallEnded: (callId: string | null, transcript: any[]) => void;
+  onCallEnded: (callId: string | null, transcript: any[], durationSeconds: number) => void;
 }
 
 interface UserInfo {
@@ -119,7 +119,7 @@ export function MobileCallInterface({ onBack, onCallEnded }: MobileCallInterface
 
   const handleEndCall = async () => {
     await endCall();
-    onCallEnded(callId, transcript);
+    onCallEnded(callId, transcript, duration);
   };
 
   return (

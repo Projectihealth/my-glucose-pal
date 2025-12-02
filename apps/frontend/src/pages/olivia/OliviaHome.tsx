@@ -268,12 +268,23 @@ function ConversationCard({
   const isDragging = useRef(false);
   const cardRef = useRef<HTMLDivElement>(null);
 
-  const handleClick = () => {
+  const handleClick = (e: React.MouseEvent) => {
+    // Prevent click if we were dragging
+    if (isDragging.current) {
+      e.stopPropagation();
+      e.preventDefault();
+      isDragging.current = false;
+      return;
+    }
+    
     // If swiped open, tap closes it
     if (Math.abs(swipeOffset) > 10) {
+      e.stopPropagation();
+      e.preventDefault();
       resetSwipe();
       return;
     }
+    
     // Navigate to conversation detail page
     navigate(`/coach/conversation/${conversation.id}`);
   };
@@ -324,9 +335,17 @@ function ConversationCard({
     startX.current = null;
   };
 
-  const handleTouchStart = (e: React.TouchEvent) => handleDragStart(e.touches[0].clientX);
-  const handleTouchMove = (e: React.TouchEvent) => handleDragMove(e.touches[0].clientX);
-  const handleTouchEnd = () => handleDragEnd();
+  const handleTouchStart = (e: React.TouchEvent) => {
+    handleDragStart(e.touches[0].clientX);
+  };
+  
+  const handleTouchMove = (e: React.TouchEvent) => {
+    handleDragMove(e.touches[0].clientX);
+  };
+  
+  const handleTouchEnd = () => {
+    handleDragEnd();
+  };
 
   const handleMouseDown = (e: React.MouseEvent) => {
     if (e.button === 0) handleDragStart(e.clientX);
@@ -339,7 +358,10 @@ function ConversationCard({
     }
   };
 
-  const handleMouseUp = () => handleDragEnd();
+  const handleMouseUp = () => {
+    handleDragEnd();
+  };
+  
   const handleMouseLeave = () => {
     if (startX.current !== null) handleDragEnd();
   };
@@ -356,7 +378,7 @@ function ConversationCard({
   };
 
   return (
-    <div className="relative overflow-hidden rounded-2xl group w-full">
+    <div className="relative overflow-hidden rounded-2xl w-full">
       {/* Background Action Layer: DELETE (Left Swipe / Right Side) */}
       <div className="absolute inset-y-0 right-0 w-24 bg-red-50 flex items-center justify-end rounded-r-2xl z-0">
         <button 
@@ -369,7 +391,7 @@ function ConversationCard({
       </div>
 
       {/* Main Card Content */}
-      <button
+      <div
         ref={cardRef}
         onClick={handleClick}
         onMouseEnter={handleMouseEnter}
@@ -380,9 +402,8 @@ function ConversationCard({
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
         onMouseLeave={handleMouseLeave}
-        className="w-full opacity-0 animate-fade-in relative z-10 transition-transform duration-300 ease-out select-none"
+        className="relative z-10 transition-transform duration-300 ease-out select-none cursor-pointer"
         style={{
-          animation: 'fadeIn 0.5s ease-out forwards',
           transform: `translateX(${swipeOffset}px)`,
         }}
       >
@@ -443,7 +464,7 @@ function ConversationCard({
           </div>
           </div>
         </div>
-      </button>
+      </div>
     </div>
   );
 }

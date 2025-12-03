@@ -1,0 +1,170 @@
+========================================
+COPY THIS ENTIRE MESSAGE TO CHATGPT/CLAUDE
+========================================
+
+I need you to generate a monthly CGM (Continuous Glucose Monitor) report. I'll provide you with:
+1. A JSON template structure you must follow exactly
+2. Sample CGM data
+3. Activity logs
+
+Please analyze the data and return a complete JSON report following the template structure.
+
+---
+
+PART 1: JSON TEMPLATE STRUCTURE
+(You must return JSON matching this exact structure)
+
+[PASTE THE CONTENTS OF monthly-report-template.json HERE]
+
+---
+
+PART 2: USER DATA
+
+User ID: user_001
+Month: November 2025
+Date Range: Nov 1 - Nov 30, 2025
+Diabetes Type: Type 1
+Age: 32
+Gender: Female
+Current Goals: Improve morning glucose control, increase TIR to 80%+
+
+Previous Month Metrics (October 2025):
+- TIR: 72%
+- Avg Glucose: 118 mg/dL
+- Hypoglycemia events: 15
+- Exercise: 2.8 days/week
+
+---
+
+PART 3: CGM DATA
+
+Total readings: 8,640 (30 days × 288 readings per day)
+Data completeness: 98.5%
+
+Sample CGM readings (showing pattern, multiply across 30 days):
+
+Nov 1:
+00:00 - 88 mg/dL
+01:00 - 85 mg/dL
+02:00 - 82 mg/dL
+03:00 - 80 mg/dL
+04:00 - 85 mg/dL
+05:00 - 95 mg/dL
+06:00 - 115 mg/dL (waking up)
+07:00 - 130 mg/dL
+08:00 - 165 mg/dL (post-breakfast spike)
+09:00 - 155 mg/dL
+10:00 - 135 mg/dL
+11:00 - 120 mg/dL
+12:00 - 135 mg/dL
+13:00 - 180 mg/dL (post-lunch spike)
+14:00 - 160 mg/dL
+15:00 - 135 mg/dL
+16:00 - 110 mg/dL (afternoon dip)
+17:00 - 120 mg/dL
+18:00 - 145 mg/dL
+19:00 - 195 mg/dL (post-dinner spike)
+20:00 - 175 mg/dL
+21:00 - 150 mg/dL
+22:00 - 125 mg/dL
+23:00 - 105 mg/dL
+
+Nov 2-30: Similar patterns with variations
+- Morning spikes (6-8 AM): Present 18/30 days, avg +35 mg/dL
+- Post-meal spikes: Breakfast +48, Lunch +52, Dinner +65 mg/dL
+- Overnight stability: Good, ±12 mg/dL variation
+- Afternoon dips (3-4 PM): Present 12/30 days, avg -28 mg/dL
+- Low glucose events: 8 events total (2 very low <54, 6 low 54-69)
+- High glucose events: 63 events (45 high 181-250, 18 very high >250)
+
+---
+
+PART 4: ACTIVITY LOGS
+
+Sleep Logs:
+Nov 1: 6.5h (poor quality)
+Nov 2: 7.8h (good quality)
+Nov 3: 8.2h (excellent - next day TIR: 82%)
+Nov 4: 7.0h (good)
+Nov 5: 5.8h (poor - next day TIR: 65%, morning glucose 145)
+...
+Average: 7.2 hours/night
+Pattern: Good sleep (>7h) → 15% better TIR next day
+
+Meal Logs:
+Nov 1:
+  07:30 - Breakfast: Oatmeal with berries (45g carbs) → spike to 165
+  12:45 - Lunch: Grilled chicken salad (20g carbs) → spike to 180
+  19:30 - Dinner: Pasta with vegetables (60g carbs) → spike to 195
+
+Nov 2:
+  08:15 - Breakfast: Eggs and toast (30g carbs) → spike to 148
+  13:00 - Lunch: Turkey sandwich (35g carbs) → spike to 170
+  20:00 - Dinner: Stir-fry with rice (55g carbs) → spike to 200
+
+...
+Patterns detected:
+- Early breakfast (<8 AM): 18% lower post-meal spikes
+- Late dinner (>8 PM): Worse overnight control
+- Meal spacing >4h: More stable glucose
+
+Exercise Logs:
+Nov 1: 30 min yoga at 8:15 AM → improved glucose all day
+Nov 2: None
+Nov 3: 45 min walk at 7:30 AM → excellent glucose control (TIR 82%)
+Nov 4: 20 min strength training at 6 PM
+...
+Frequency: 4.2 days/week (up from 2.8 last month)
+Average duration: 35 minutes
+Pattern: Morning exercise (7-9 AM) shows strongest effect → 12% higher TIR
+Exercise days had 4-6 hours of improved glucose control after
+
+Stress Logs:
+Nov 5: High stress (work deadline) → glucose spike to 185 at 3 PM
+Nov 12: High stress (poor sleep + meeting) → elevated all day
+Nov 19: High stress → afternoon spike
+...
+High stress days: 8 total (27% of month)
+Pattern: Stress → +18 mg/dL average, typically 2-5 PM spikes
+
+---
+
+PART 5: INSTRUCTIONS
+
+Based on this data, generate a complete monthly CGM report by:
+
+1. Calculating accurate metrics:
+   - Time in Range (70-180): Estimate ~78%
+   - Average glucose: ~112 mg/dL
+   - Coefficient of Variation: ~28%
+   - Weekly progression: Week 1: 72%, Week 2: 76%, Week 3: 81%, Week 4: 83%
+
+2. Identifying patterns:
+   - Morning spikes (dawn phenomenon)
+   - Post-meal glucose responses
+   - Overnight stability
+   - Afternoon dips
+   - Behavior correlations
+
+3. Generating 6 prioritized recommendations:
+   - 2 HIGH priority (biggest impact opportunities)
+   - 3 MEDIUM priority (good improvements)
+   - 1 LOW priority (fine-tuning)
+
+4. Highlighting wins:
+   - TIR improved 72% → 83% (+11%)
+   - Exercise consistency improved
+   - Overnight control excellent
+   - Reduced hypoglycemia by 40% vs last month
+
+5. Areas for improvement:
+   - Morning spikes (biggest opportunity)
+   - Dinner timing and composition
+   - Weekend meal consistency
+
+Return ONLY the JSON object following the template structure exactly.
+Be specific, quantitative, and actionable in recommendations.
+
+---
+
+GENERATE THE REPORT NOW

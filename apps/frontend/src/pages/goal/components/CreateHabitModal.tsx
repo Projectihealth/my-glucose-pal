@@ -12,6 +12,7 @@ import {
   TextIcon,
   CheckIcon
 } from './Icons';
+import { Bell } from 'lucide-react';
 
 interface CreateHabitModalProps {
   isOpen: boolean;
@@ -70,6 +71,8 @@ export const CreateHabitModal: React.FC<CreateHabitModalProps> = ({
   const [frequency, setFrequency] = useState(7);
   const [emoji, setEmoji] = useState('✨');
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const [notificationEnabled, setNotificationEnabled] = useState(false);
+  const [notificationTime, setNotificationTime] = useState('09:00');
 
   // Simple Emoji List for MVP
   const EMOJI_LIST = ["⚡", "💧", "🥑", "🍳", "🏃", "🧘", "📚", "💤", "💊", "🥦", "🚶", "🏋️", "🥗", "🍵"];
@@ -83,6 +86,8 @@ export const CreateHabitModal: React.FC<CreateHabitModalProps> = ({
             setCategory(initialData.category);
             setFrequency(initialData.frequency);
             setEmoji(initialData.emoji || '✨');
+            setNotificationEnabled(!!initialData.notificationTime);
+            setNotificationTime(initialData.notificationTime || '09:00');
             setShowArchived(false);
         } else {
             // Create Mode: Reset Fields
@@ -102,7 +107,8 @@ export const CreateHabitModal: React.FC<CreateHabitModalProps> = ({
       description,
       category,
       frequency,
-      emoji
+      emoji,
+      notificationTime: notificationEnabled ? notificationTime : undefined
     });
 
     // Do not reset form immediately if it's an edit to prevent UI jump before close
@@ -116,6 +122,8 @@ export const CreateHabitModal: React.FC<CreateHabitModalProps> = ({
     setCategory(HabitCategory.NUTRITION);
     setFrequency(7);
     setEmoji('✨');
+    setNotificationEnabled(false);
+    setNotificationTime('09:00');
     setShowArchived(false);
   };
 
@@ -340,6 +348,56 @@ export const CreateHabitModal: React.FC<CreateHabitModalProps> = ({
                                      </button>
                                  );
                              })}
+                        </div>
+                    </div>
+
+                    {/* Notification Setting */}
+                    <div>
+                        <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-2">Reminder (Optional)</label>
+                        <div className="space-y-3">
+                            {/* Toggle Switch */}
+                            <button
+                                type="button"
+                                onClick={() => setNotificationEnabled(!notificationEnabled)}
+                                className={`
+                                    w-full flex items-center justify-between px-4 py-3.5 rounded-xl border transition-all duration-200
+                                    ${notificationEnabled
+                                        ? 'bg-blue-50 border-blue-500/50 text-blue-700'
+                                        : 'bg-slate-50 border-slate-200 text-slate-600 hover:border-slate-300'}
+                                `}
+                            >
+                                <div className="flex items-center gap-3">
+                                    <div className={`
+                                        w-8 h-8 rounded-lg flex items-center justify-center transition-colors
+                                        ${notificationEnabled ? 'bg-blue-200/50' : 'bg-slate-100'}
+                                    `}>
+                                        <Bell className={`w-4 h-4 ${notificationEnabled ? 'text-blue-600' : 'text-slate-400'}`} />
+                                    </div>
+                                    <span className="text-sm font-bold">Daily Reminder</span>
+                                </div>
+                                <div className={`
+                                    w-11 h-6 rounded-full transition-all duration-200 relative
+                                    ${notificationEnabled ? 'bg-blue-500' : 'bg-slate-300'}
+                                `}>
+                                    <div className={`
+                                        absolute top-1 w-4 h-4 bg-white rounded-full shadow-sm transition-all duration-200
+                                        ${notificationEnabled ? 'left-6' : 'left-1'}
+                                    `} />
+                                </div>
+                            </button>
+
+                            {/* Time Picker - Only show when enabled */}
+                            {notificationEnabled && (
+                                <div className="animate-in fade-in slide-in-from-top-2 duration-200">
+                                    <input
+                                        type="time"
+                                        value={notificationTime}
+                                        onChange={(e) => setNotificationTime(e.target.value)}
+                                        className="w-full px-4 py-4 rounded-xl bg-white border border-blue-200 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 outline-none transition-all text-slate-800 font-medium text-center text-lg"
+                                    />
+                                    <p className="text-xs text-slate-500 mt-2 text-center">You'll receive a notification at this time each day</p>
+                                </div>
+                            )}
                         </div>
                     </div>
 

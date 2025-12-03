@@ -1,11 +1,11 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Heart, MessageCircle, Share2, Plus, Filter, TrendingUp, Bookmark, Play, BookOpen, Headphones, Video, Clock, CheckCircle2, Users, Sparkles, ChevronRight, X, Send, Image as ImageIcon, Smile } from 'lucide-react';
+import { Heart, MessageCircle, Share2, Plus, Filter, TrendingUp, Bookmark, Play, BookOpen, Headphones, Video, Clock, CheckCircle2, Users, Sparkles, ChevronRight, X, Send, Image as ImageIcon, Smile, Trophy, Flame, Medal, Crown } from 'lucide-react';
 import { toast } from 'sonner';
 import { TabHeader } from './TabHeader';
 import { useNavigate } from 'react-router-dom';
 
-type MainTab = 'feed' | 'resources';
+type MainTab = 'feed' | 'leaderboard' | 'resources';
 type FeedFilter = 'all' | 'following' | 'popular';
 type ResourceType = 'all' | 'articles' | 'podcasts' | 'videos';
 type ResourceCategory = 'all' | 'weight' | 'glucose' | 'fitness';
@@ -50,6 +50,19 @@ interface Resource {
   progress?: number;
   isCompleted: boolean;
   author?: string;
+}
+
+interface LeaderboardUser {
+  id: string;
+  name: string;
+  initials: string;
+  streak: number; // max 30 days
+  rank: number;
+  isCurrentUser: boolean;
+  avatar?: string;
+  participationScore: number; // comprehensive score based on streaks, chatting, and to-dos
+  coachingChats: number; // number of Olivia conversations
+  todosCompleted: number; // number of completed to-dos
 }
 
 const mockPosts: CommunityPost[] = [
@@ -192,14 +205,29 @@ const mockResources: Resource[] = [
   },
 ];
 
+const mockLeaderboard: LeaderboardUser[] = [
+  // Participation Score = (streak * 10) + (coachingChats * 5) + (todosCompleted * 2)
+  { id: '1', name: 'Sarah C', initials: 'SC', streak: 30, rank: 1, isCurrentUser: false, participationScore: 410, coachingChats: 12, todosCompleted: 25 },
+  { id: '2', name: 'Michael T', initials: 'MT', streak: 28, rank: 2, isCurrentUser: false, participationScore: 399, coachingChats: 15, todosCompleted: 22 },
+  { id: '3', name: 'Emma R', initials: 'ER', streak: 30, rank: 3, isCurrentUser: false, participationScore: 398, coachingChats: 10, todosCompleted: 24 },
+  { id: '4', name: 'David K', initials: 'DK', streak: 25, rank: 4, isCurrentUser: false, participationScore: 335, coachingChats: 9, todosCompleted: 20 },
+  { id: '5', name: 'Yijia L', initials: 'YO', streak: 23, rank: 5, isCurrentUser: true, participationScore: 321, coachingChats: 11, todosCompleted: 18 },
+  { id: '6', name: 'Olivia M', initials: 'OM', streak: 21, rank: 6, isCurrentUser: false, participationScore: 305, coachingChats: 13, todosCompleted: 15 },
+  { id: '7', name: 'James W', initials: 'JW', streak: 19, rank: 7, isCurrentUser: false, participationScore: 262, coachingChats: 8, todosCompleted: 16 },
+  { id: '8', name: 'Lisa A', initials: 'LA', streak: 17, rank: 8, isCurrentUser: false, participationScore: 248, coachingChats: 10, todosCompleted: 14 },
+  { id: '9', name: 'Ryan P', initials: 'RP', streak: 15, rank: 9, isCurrentUser: false, participationScore: 209, coachingChats: 7, todosCompleted: 12 },
+  { id: '10', name: 'Sophia L', initials: 'SL', streak: 12, rank: 10, isCurrentUser: false, participationScore: 187, coachingChats: 9, todosCompleted: 11 },
+];
+
 export function CommunityTab() {
   const navigate = useNavigate();
-  const [mainTab, setMainTab] = useState<MainTab>('feed');
+  const [mainTab, setMainTab] = useState<MainTab>('leaderboard');
   const [feedFilter, setFeedFilter] = useState<FeedFilter>('all');
   const [resourceType, setResourceType] = useState<ResourceType>('all');
   const [resourceCategory, setResourceCategory] = useState<ResourceCategory>('all');
   const [posts, setPosts] = useState<CommunityPost[]>(mockPosts);
   const [resources] = useState<Resource[]>(mockResources);
+  const [leaderboard] = useState<LeaderboardUser[]>(mockLeaderboard);
   const [showCreatePost, setShowCreatePost] = useState(false);
   const [newPostTitle, setNewPostTitle] = useState('');
   const [newPostContent, setNewPostContent] = useState('');
@@ -368,6 +396,18 @@ export function CommunityTab() {
         <div className="px-6">
           <div className="flex gap-2 bg-gray-100 rounded-xl p-1">
             <button
+            onClick={() => setMainTab('leaderboard')}
+            className={`flex-1 py-2.5 rounded-lg text-sm transition-all ${
+              mainTab === 'leaderboard'
+                ? 'bg-white text-gray-900 shadow-sm'
+                : 'text-gray-500'
+            }`}
+            style={{ fontWeight: 600 }}
+          >
+            <Trophy className="w-4 h-4 inline mr-1.5" />
+            Ranking
+          </button>
+          <button
             onClick={() => setMainTab('feed')}
             className={`flex-1 py-2.5 rounded-lg text-sm transition-all ${
               mainTab === 'feed'
@@ -377,7 +417,7 @@ export function CommunityTab() {
             style={{ fontWeight: 600 }}
           >
             <Users className="w-4 h-4 inline mr-1.5" />
-            Community Feed
+            Feed
           </button>
           <button
             onClick={() => setMainTab('resources')}
@@ -389,7 +429,7 @@ export function CommunityTab() {
             style={{ fontWeight: 600 }}
           >
             <BookOpen className="w-4 h-4 inline mr-1.5" />
-            Resources
+            Learn
           </button>
           </div>
         </div>
@@ -615,6 +655,175 @@ export function CommunityTab() {
               </p>
             </div>
           )}
+        </div>
+      )}
+
+      {/* Leaderboard Tab Content */}
+      {mainTab === 'leaderboard' && (
+        <div className="py-6">
+          {/* Stats Header */}
+          <div className="px-6 mb-6">
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="bg-gradient-to-br from-amber-500 to-orange-600 rounded-3xl p-6 text-white shadow-lg"
+            >
+              <div className="flex items-center justify-between mb-4">
+                <div>
+                  <p className="text-white/80 text-sm mb-1" style={{ fontWeight: 500 }}>Your Participation Score</p>
+                  <div className="flex items-center gap-2">
+                    <Trophy className="w-8 h-8 text-white" />
+                    <span className="text-4xl" style={{ fontWeight: 700 }}>
+                      {leaderboard.find(u => u.isCurrentUser)?.participationScore || 0}
+                    </span>
+                    <span className="text-xl text-white/80 mt-2" style={{ fontWeight: 500 }}>pts</span>
+                  </div>
+                  <div className="flex items-center gap-2 mt-2">
+                    <Flame className="w-4 h-4 text-white/80" />
+                    <span className="text-sm text-white/90">{leaderboard.find(u => u.isCurrentUser)?.streak || 0} day streak</span>
+                  </div>
+                </div>
+                <div className="text-center">
+                  <div className="w-16 h-16 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center mb-2">
+                    <span className="text-3xl" style={{ fontWeight: 700 }}>#{leaderboard.find(u => u.isCurrentUser)?.rank || 0}</span>
+                  </div>
+                  <p className="text-xs text-white/80" style={{ fontWeight: 500 }}>Your Rank</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2 text-sm text-white/90">
+                <Sparkles className="w-4 h-4" />
+                <span>Logging, coaching chats & to-dos count! 🎉</span>
+              </div>
+            </motion.div>
+          </div>
+
+          {/* Leaderboard Title */}
+          <div className="px-6 mb-4">
+            <h2 className="text-gray-900 mb-1" style={{ fontSize: '22px', fontWeight: 700 }}>
+              Monthly Leaderboard
+            </h2>
+            <p className="text-gray-600 text-sm mb-2">
+              Ranked by daily logging streaks
+            </p>
+            <div className="flex flex-wrap gap-2 text-xs text-gray-400">
+              <span className="flex items-center gap-1" >
+                <Flame className="w-3 h-3 text-orange-500" />
+                Streaks (max 30 days)
+              </span>
+            </div>
+          </div>
+
+          {/* Leaderboard List */}
+          <div className="px-6 space-y-3">
+            {leaderboard.map((user, index) => (
+              <motion.div
+                key={user.id}
+                initial={{ opacity: 0, x: -20 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: index * 0.05 }}
+                className={`rounded-2xl border shadow-sm transition-all ${
+                  user.isCurrentUser
+                    ? 'bg-gradient-to-r from-blue-50 to-purple-50 border-[#5B7FF3] shadow-md scale-[1.02]'
+                    : 'bg-white border-gray-100 hover:border-gray-200'
+                }`}
+              >
+                <div className="p-4 flex items-center gap-4">
+                  {/* Rank Badge */}
+                  <div className="flex-shrink-0 w-10 flex items-center justify-center">
+                    {user.rank === 1 && (
+                      <div className="w-10 h-10 rounded-full bg-gradient-to-br from-yellow-400 to-amber-500 flex items-center justify-center shadow-md">
+                        <Crown className="w-5 h-5 text-white" />
+                      </div>
+                    )}
+                    {user.rank === 2 && (
+                      <div className="w-10 h-10 rounded-full bg-gradient-to-br from-gray-300 to-gray-400 flex items-center justify-center shadow-md">
+                        <Medal className="w-5 h-5 text-white" />
+                      </div>
+                    )}
+                    {user.rank === 3 && (
+                      <div className="w-10 h-10 rounded-full bg-gradient-to-br from-orange-400 to-orange-500 flex items-center justify-center shadow-md">
+                        <Medal className="w-5 h-5 text-white" />
+                      </div>
+                    )}
+                    {user.rank > 3 && (
+                      <span className="text-gray-400 text-lg" style={{ fontWeight: 600 }}>
+                        #{user.rank}
+                      </span>
+                    )}
+                  </div>
+
+                  {/* User Avatar */}
+                  <div className={`w-12 h-12 rounded-full flex items-center justify-center flex-shrink-0 ${
+                    user.isCurrentUser
+                      ? 'bg-gradient-to-br from-[#5B7FF3] to-[#7B9FF9]'
+                      : 'bg-gradient-to-br from-purple-400 to-pink-400'
+                  }`}>
+                    <span className="text-white" style={{ fontWeight: 600, fontSize: '14px' }}>
+                      {user.initials}
+                    </span>
+                  </div>
+
+                  {/* User Info */}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-1">
+                      <h3 className={`text-sm truncate ${user.isCurrentUser ? 'text-[#5B7FF3]' : 'text-gray-900'}`} style={{ fontWeight: 600 }}>
+                        {user.name}
+                      </h3>
+                      {user.isCurrentUser && (
+                        <span className="px-2 py-0.5 rounded-full bg-[#5B7FF3] text-white text-xs" style={{ fontWeight: 600 }}>
+                          You
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2 text-xs text-gray-500">
+                      <span className="flex items-center gap-0.5">
+                        <Flame className="w-3 h-3 text-orange-500" />
+                        {user.streak}d streak
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Participation Score */}
+                  <div className="flex flex-col items-end gap-0.5">
+                    <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gradient-to-br from-purple-50 to-blue-50 border border-purple-100">
+                      <Trophy className="w-3.5 h-3.5 text-[#5B7FF3]" />
+                      <span className="text-[#5B7FF3]" style={{ fontWeight: 700, fontSize: '16px' }}>
+                        {user.participationScore}
+                      </span>
+                    </div>
+                    <span className="text-xs text-gray-400" style={{ fontWeight: 500 }}>points</span>
+                  </div>
+                </div>
+              </motion.div>
+            ))}
+          </div>
+
+          {/* Motivation Footer */}
+          <div className="px-6 mt-6">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 0.5 }}
+              className="bg-gradient-to-r from-blue-50 to-purple-50 rounded-2xl p-5 border border-blue-100"
+            >
+              <div className="flex items-start gap-3">
+                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#5B7FF3] to-purple-600 flex items-center justify-center flex-shrink-0">
+                  <Sparkles className="w-5 h-5 text-white" />
+                </div>
+                <div>
+                  <h3 className="text-gray-900 mb-1" style={{ fontWeight: 600, fontSize: '15px' }}>
+                    How to Earn Points
+                  </h3>
+                  <p className="text-gray-600 text-sm leading-relaxed mb-2">
+                    Climb the leaderboard by maintaining your daily logging streaks:
+                  </p>
+                  <ul className="text-gray-600 text-xs space-y-1">
+                    <li>🔥 <strong>Daily logging streaks</strong> (10 pts per day, max 30 days)</li>
+                  </ul>
+                </div>
+              </div>
+            </motion.div>
+          </div>
         </div>
       )}
 

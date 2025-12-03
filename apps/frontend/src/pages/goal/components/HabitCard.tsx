@@ -1,14 +1,15 @@
 import React, { useState, useRef } from 'react';
 import { format, subDays, isSameDay, isSameWeek, parseISO } from 'date-fns';
 import { Habit, HabitCategory } from '../types';
-import { 
-  CheckIcon, 
+import {
+  CheckIcon,
   CameraIcon,
   PaperclipIcon,
   TrashIcon,
   EditIcon,
   MicIcon
 } from './Icons';
+import { Bell } from 'lucide-react';
 
 interface HabitCardProps {
   habit: Habit;
@@ -29,6 +30,14 @@ const getCategoryStyles = (category: HabitCategory) => {
       default: return { bg: 'bg-slate-50', text: 'text-slate-500', border: 'border-slate-100' };
     }
   };
+
+const formatNotificationTime = (time: string) => {
+  const [hours, minutes] = time.split(':');
+  const hour = parseInt(hours);
+  const ampm = hour >= 12 ? 'PM' : 'AM';
+  const displayHour = hour % 12 || 12;
+  return `${displayHour}:${minutes} ${ampm}`;
+};
 
 export const HabitCard: React.FC<HabitCardProps> = ({ habit, onToggle, onDelete, onEdit, onClickBody, isCompletedToday, selectedDate }) => {
   const styles = getCategoryStyles(habit.category);
@@ -238,6 +247,16 @@ export const HabitCard: React.FC<HabitCardProps> = ({ habit, onToggle, onDelete,
                         <span className={`text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-lg border ${styles.bg} ${styles.text} ${styles.border}`}>
                             {habit.category}
                         </span>
+                      )}
+
+                      {/* Notification Badge */}
+                      {habit.notificationTime && (
+                        <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-100">
+                          <Bell className="w-3 h-3 text-blue-500" />
+                          <span className="text-[10px] font-bold text-blue-600">
+                            {formatNotificationTime(habit.notificationTime)}
+                          </span>
+                        </div>
                       )}
                       
                       {/* Rich Data Indicators - Updated Colors */}

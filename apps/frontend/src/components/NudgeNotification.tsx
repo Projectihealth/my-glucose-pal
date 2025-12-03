@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence, useMotionValue, useTransform, PanInfo } from 'framer-motion';
-import { X, Check, Coffee, Dumbbell, Moon, Apple, Utensils, Droplet, Bell, ChevronRight } from 'lucide-react';
+import { X, Plus, Coffee, Dumbbell, Moon, Apple, Utensils, Droplet, Bell, ChevronRight } from 'lucide-react';
 
 export interface NudgeData {
   id: string;
@@ -455,8 +455,8 @@ export function NudgeNotification({ onComplete, onDismiss, testMode = false }: N
                       boxShadow: `0 4px 12px ${currentNudge.color}40`,
                     }}
                   >
-                    <Check className="w-4 h-4" />
-                    Mark Done
+                    <Plus className="w-4 h-4" />
+                    Log Now
                   </button>
                 </motion.div>
 

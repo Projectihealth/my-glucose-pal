@@ -1,5 +1,7 @@
-import { ChevronDown, TrendingUp, TrendingDown, Activity, Moon, Utensils, Plus, Check, Mic, Coffee, Apple, Dumbbell, Brain, MessageSquare, X, Send, Circle, Pencil, Trash2, Clock, Zap, History, ChevronRight, Sparkles } from 'lucide-react';
+import { ChevronDown, TrendingUp, TrendingDown, Activity, Moon, Utensils, Plus, Check, Mic, Coffee, Apple, Dumbbell, Brain, MessageSquare, X, Send, Circle, Pencil, Trash2, Clock, Zap, History, ChevronRight, Sparkles, FileText, Award, ArrowRight, Scale } from 'lucide-react';
 import { useState, useRef } from 'react';
+import { createPortal } from 'react-dom';
+import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine, ReferenceDot, Line } from 'recharts';
@@ -42,6 +44,22 @@ interface LogEvent {
   icon: any;
   color: string;
   bgColor: string;
+}
+
+interface MealScore {
+  mealId: string;
+  mealName: string;
+  mealType: 'breakfast' | 'lunch' | 'dinner' | 'snack';
+  date: string;
+  time: string;
+  baselineGlucose: number;
+  peakGlucose: number;
+  glucoseIncrease: number;
+  timeToPeak: number; // minutes
+  timeToBaseline: number; // minutes
+  areaUnderCurve: number;
+  score: number; // 0-100
+  rating: 'excellent' | 'good' | 'moderate' | 'poor';
 }
 
 // Simplified interface - goals integration can be added later
@@ -212,6 +230,139 @@ const getEventsForDate = (date: string): LogEvent[] => {
   }
 };
 
+// Calculate meal score based on glucose response
+const calculateMealScore = (
+  cgmData: CGMDataPoint[],
+  mealEvent: LogEvent,
+  date: string
+): MealScore => {
+  const mealHour = mealEvent.hour;
+  const mealIndex = cgmData.findIndex(d => d.hour === mealHour);
+
+  if (mealIndex === -1) {
+    return {
+      mealId: mealEvent.id,
+      mealName: mealEvent.description,
+      mealType: mealEvent.mealType || 'snack',
+      date,
+      time: mealEvent.time,
+      baselineGlucose: 0,
+      peakGlucose: 0,
+      glucoseIncrease: 0,
+      timeToPeak: 0,
+      timeToBaseline: 0,
+      areaUnderCurve: 0,
+      score: 0,
+      rating: 'poor'
+    };
+  }
+
+  const baselineGlucose = cgmData[mealIndex].value;
+
+  // Look at next 4 hours (post-meal window)
+  const postMealWindow = cgmData.slice(mealIndex, Math.min(mealIndex + 5, cgmData.length));
+  const validReadings = postMealWindow.filter(d => d.value !== null);
+
+  // Find peak glucose
+  let peakGlucose = baselineGlucose;
+  let peakIndex = 0;
+  validReadings.forEach((reading, idx) => {
+    if (reading.value > peakGlucose) {
+      peakGlucose = reading.value;
+      peakIndex = idx;
+    }
+  });
+
+  const glucoseIncrease = peakGlucose - baselineGlucose;
+  const timeToPeak = peakIndex * 60; // Convert to minutes
+
+  // Find time to return to baseline (within 10 mg/dL of baseline)
+  let timeToBaseline = 240; // Default 4 hours if doesn't return
+  for (let i = peakIndex; i < validReadings.length; i++) {
+    if (Math.abs(validReadings[i].value - baselineGlucose) <= 10) {
+      timeToBaseline = i * 60;
+      break;
+    }
+  }
+
+  // Calculate area under curve (simplified)
+  let auc = 0;
+  for (let i = 0; i < validReadings.length - 1; i++) {
+    const glucoseAboveBaseline = Math.max(0, validReadings[i].value - baselineGlucose);
+    auc += glucoseAboveBaseline * 60; // mg/dL * minutes
+  }
+
+  // Calculate score (0-100, higher is better)
+  let score = 100;
+
+  // Penalize high glucose increase (ideal < 30 mg/dL)
+  if (glucoseIncrease > 30) {
+    score -= Math.min(40, (glucoseIncrease - 30) * 0.8);
+  }
+
+  // Penalize slow return to baseline (ideal < 120 min)
+  if (timeToBaseline > 120) {
+    score -= Math.min(30, (timeToBaseline - 120) * 0.15);
+  }
+
+  // Penalize large AUC
+  if (auc > 3000) {
+    score -= Math.min(20, (auc - 3000) * 0.003);
+  }
+
+  // Bonus for very fast peak (30-45 min is good)
+  if (timeToPeak >= 30 && timeToPeak <= 60) {
+    score += 5;
+  }
+
+  score = Math.max(0, Math.min(100, score));
+
+  // Determine rating
+  let rating: 'excellent' | 'good' | 'moderate' | 'poor';
+  if (score >= 85) rating = 'excellent';
+  else if (score >= 70) rating = 'good';
+  else if (score >= 50) rating = 'moderate';
+  else rating = 'poor';
+
+  return {
+    mealId: mealEvent.id,
+    mealName: mealEvent.description,
+    mealType: mealEvent.mealType || 'snack',
+    date,
+    time: mealEvent.time,
+    baselineGlucose,
+    peakGlucose,
+    glucoseIncrease,
+    timeToPeak,
+    timeToBaseline,
+    areaUnderCurve: auc,
+    score: Math.round(score),
+    rating
+  };
+};
+
+// Get meal scores for a specific date
+const getMealScoresForDate = (date: string): MealScore[] => {
+  const cgmData = generateCGMDataForDate(date);
+  const events = getEventsForDate(date);
+  const mealEvents = events.filter(e => e.type === 'meal');
+
+  return mealEvents.map(meal => calculateMealScore(cgmData, meal, date));
+};
+
+// Get all meal scores from all available dates
+const getAllMealScores = (): MealScore[] => {
+  const allDates = ['Dec 1', 'Dec 2', 'Dec 3'];
+  const allScores: MealScore[] = [];
+
+  allDates.forEach(date => {
+    const dateScores = getMealScoresForDate(date);
+    allScores.push(...dateScores);
+  });
+
+  return allScores;
+};
+
 // Custom Tooltip Component with Events
 const CustomTooltip = ({ active, payload, events }: any) => {
   if (active && payload && payload.length) {
@@ -331,6 +482,7 @@ const generateGlucoseProjections = (
 };
 
 export function CGMTab({}: CGMTabProps = {}) {
+  const navigate = useNavigate();
   const [currentDate, setCurrentDate] = useState('Dec 3');
   const [showPatterns, setShowPatterns] = useState(false);
   const [showLogModal, setShowLogModal] = useState(false);
@@ -343,6 +495,13 @@ export function CGMTab({}: CGMTabProps = {}) {
   const [editingEvent, setEditingEvent] = useState<LogEvent | null>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState<string | null>(null);
   const [expandedPatterns, setExpandedPatterns] = useState<{ [key: string]: boolean }>({});
+
+  // Meal scoring state
+  const [mealScores, setMealScores] = useState<MealScore[]>(getMealScoresForDate('Dec 3'));
+  const [showMealScores, setShowMealScores] = useState(false);
+  const [showComparisonModal, setShowComparisonModal] = useState(false);
+  const [comparisonMeal1, setComparisonMeal1] = useState<MealScore | null>(null);
+  const [comparisonMeal2, setComparisonMeal2] = useState<MealScore | null>(null);
 
   const [logEvents, setLogEvents] = useState<LogEvent[]>(getEventsForDate('Dec 3'));
   
@@ -521,6 +680,14 @@ export function CGMTab({}: CGMTabProps = {}) {
     setCurrentDate(newDate);
     setCgmData(generateCGMDataForDate(newDate));
     setLogEvents(getEventsForDate(newDate));
+    setMealScores(getMealScoresForDate(newDate));
+  };
+
+  // Open comparison modal with two meals
+  const openComparisonModal = (meal1: MealScore, meal2: MealScore) => {
+    setComparisonMeal1(meal1);
+    setComparisonMeal2(meal2);
+    setShowComparisonModal(true);
   };
 
   const startRecording = () => {
@@ -1114,6 +1281,211 @@ export function CGMTab({}: CGMTabProps = {}) {
         </motion.div>
       </div>
 
+      {/* Meal Performance Scores */}
+      <div className="px-6 mt-6">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden"
+        >
+          <button
+            onClick={() => setShowMealScores(!showMealScores)}
+            className="w-full p-5 flex items-center justify-between hover:bg-gray-50/50 transition-colors"
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-orange-500 to-red-600 flex items-center justify-center">
+                <Award className="w-5 h-5 text-white" />
+              </div>
+              <div className="text-left">
+                <h3 className="text-gray-900" style={{ fontSize: '17px', fontWeight: 600 }}>
+                  Meal Performance
+                </h3>
+                <p className="text-gray-500 text-xs mt-0.5">
+                  {mealScores.length} meals analyzed today
+                </p>
+              </div>
+            </div>
+            <motion.div
+              animate={{ rotate: showMealScores ? 180 : 0 }}
+              transition={{ duration: 0.2 }}
+            >
+              <ChevronDown className="w-5 h-5 text-gray-400" />
+            </motion.div>
+          </button>
+
+          <AnimatePresence>
+            {showMealScores && (
+              <motion.div
+                initial={{ height: 0, opacity: 0 }}
+                animate={{ height: 'auto', opacity: 1 }}
+                exit={{ height: 0, opacity: 0 }}
+                transition={{ duration: 0.3 }}
+                className="overflow-hidden"
+              >
+                <div className="px-5 pb-5 border-t border-gray-100 pt-5 space-y-4">
+                  {/* Top Meals */}
+                  {mealScores.length > 0 && (
+                    <>
+                      <div>
+                        <h4 className="text-sm font-bold text-gray-900 mb-3 flex items-center gap-2">
+                          <TrendingUp className="w-4 h-4 text-green-600" />
+                          Best Meals Today
+                        </h4>
+                        <div className="space-y-2">
+                          {mealScores
+                            .sort((a, b) => b.score - a.score)
+                            .slice(0, 2)
+                            .map((meal, idx) => (
+                              <div
+                                key={meal.mealId}
+                                className="bg-green-50 rounded-xl p-4 border border-green-200"
+                              >
+                                <div className="flex items-start justify-between mb-2">
+                                  <div className="flex-1">
+                                    <div className="flex items-center gap-2 mb-1">
+                                      <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${
+                                        idx === 0 ? 'bg-yellow-400 text-yellow-900' : 'bg-gray-300 text-gray-700'
+                                      }`}>
+                                        {idx + 1}
+                                      </span>
+                                      <h5 className="font-bold text-green-900">{meal.mealName}</h5>
+                                    </div>
+                                    <p className="text-xs text-green-700 capitalize">
+                                      {meal.mealType} • {meal.time}
+                                    </p>
+                                  </div>
+                                  <div className="text-right">
+                                    <div className="text-2xl font-bold text-green-700">{meal.score}</div>
+                                    <div className="text-[10px] text-green-600 font-medium">out of 100</div>
+                                  </div>
+                                </div>
+                                <div className="grid grid-cols-3 gap-2 mt-3">
+                                  <div className="bg-white rounded-lg p-2">
+                                    <div className="text-[10px] text-gray-500 font-medium mb-0.5">Peak Rise</div>
+                                    <div className="text-sm font-bold text-gray-900">+{meal.glucoseIncrease}</div>
+                                    <div className="text-[9px] text-gray-500">mg/dL</div>
+                                  </div>
+                                  <div className="bg-white rounded-lg p-2">
+                                    <div className="text-[10px] text-gray-500 font-medium mb-0.5">To Peak</div>
+                                    <div className="text-sm font-bold text-gray-900">{meal.timeToPeak}</div>
+                                    <div className="text-[9px] text-gray-500">minutes</div>
+                                  </div>
+                                  <div className="bg-white rounded-lg p-2">
+                                    <div className="text-[10px] text-gray-500 font-medium mb-0.5">Recovery</div>
+                                    <div className="text-sm font-bold text-gray-900">{meal.timeToBaseline}</div>
+                                    <div className="text-[9px] text-gray-500">minutes</div>
+                                  </div>
+                                </div>
+                              </div>
+                            ))}
+                        </div>
+                      </div>
+
+                      {/* Meals to Reconsider */}
+                      {mealScores.some(m => m.score < 70) && (
+                        <div>
+                          <h4 className="text-sm font-bold text-gray-900 mb-3 flex items-center gap-2">
+                            <TrendingDown className="w-4 h-4 text-amber-600" />
+                            Meals to Reconsider
+                          </h4>
+                          <div className="space-y-2">
+                            {mealScores
+                              .filter(m => m.score < 70)
+                              .sort((a, b) => a.score - b.score)
+                              .slice(0, 2)
+                              .map((meal) => (
+                                <div
+                                  key={meal.mealId}
+                                  className="bg-amber-50 rounded-xl p-4 border border-amber-200"
+                                >
+                                  <div className="flex items-start justify-between mb-2">
+                                    <div className="flex-1">
+                                      <h5 className="font-bold text-amber-900 mb-1">{meal.mealName}</h5>
+                                      <p className="text-xs text-amber-700 capitalize">
+                                        {meal.mealType} • {meal.time}
+                                      </p>
+                                    </div>
+                                    <div className="text-right">
+                                      <div className="text-2xl font-bold text-amber-700">{meal.score}</div>
+                                      <div className="text-[10px] text-amber-600 font-medium">needs work</div>
+                                    </div>
+                                  </div>
+                                  <div className="bg-white rounded-lg p-3 mt-2">
+                                    <p className="text-xs text-amber-900">
+                                      <strong>High glucose spike:</strong> +{meal.glucoseIncrease} mg/dL spike with {meal.timeToBaseline} min recovery time
+                                    </p>
+                                  </div>
+                                </div>
+                              ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Meal Comparison Button */}
+                      {mealScores.length >= 1 && (
+                        <button
+                          onClick={() => {
+                            const allMeals = getAllMealScores();
+                            if (allMeals.length >= 2) {
+                              const sortedMeals = [...allMeals].sort((a, b) => b.score - a.score);
+                              openComparisonModal(sortedMeals[0], sortedMeals[sortedMeals.length - 1]);
+                            }
+                          }}
+                          className="w-full py-3 rounded-xl bg-gradient-to-r from-blue-600 to-purple-600 text-white hover:from-blue-700 hover:to-purple-700 transition-all flex items-center justify-center gap-2 mt-4"
+                          style={{ fontWeight: 600, fontSize: '14px' }}
+                        >
+                          <Scale className="w-4 h-4" />
+                          Compare All Past Meals
+                        </button>
+                      )}
+                    </>
+                  )}
+
+                  {mealScores.length === 0 && (
+                    <div className="text-center py-8">
+                      <Utensils className="w-12 h-12 text-gray-300 mx-auto mb-3" />
+                      <p className="text-gray-500 text-sm">No meals logged today</p>
+                      <p className="text-gray-400 text-xs mt-1">Add meals to see performance scores</p>
+                    </div>
+                  )}
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </motion.div>
+      </div>
+
+      {/* Monthly Report Card */}
+      <div className="px-6 mt-6 mb-6">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="bg-gradient-to-br from-purple-50 to-blue-50 rounded-3xl border border-purple-200 shadow-sm p-6"
+        >
+          <div className="flex items-start gap-4">
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-500 to-blue-600 flex items-center justify-center flex-shrink-0">
+              <FileText className="w-5 h-5 text-white" />
+            </div>
+            <div className="flex-1">
+              <h3 className="text-gray-900 mb-1" style={{ fontSize: '17px', fontWeight: 600 }}>
+                Monthly CGM Report
+              </h3>
+              <p className="text-gray-600 text-sm mb-4">
+                View detailed analysis of your glucose patterns, behavior correlations, and personalized AI recommendations for the past month.
+              </p>
+              <button
+                onClick={() => navigate('/monthly-report')}
+                className="w-full py-3 rounded-xl bg-gradient-to-r from-[#5B7FF3] to-[#7B9FF9] text-white hover:opacity-90 transition-all flex items-center justify-center gap-2"
+                style={{ fontWeight: 600, fontSize: '15px' }}
+              >
+                <Sparkles className="w-5 h-5" />
+                View Monthly Report
+              </button>
+            </div>
+          </div>
+        </motion.div>
+      </div>
+
       {/* Floating Log Button */}
       <motion.button
         initial={{ scale: 0 }}
@@ -1128,26 +1500,27 @@ export function CGMTab({}: CGMTabProps = {}) {
       </motion.button>
 
       {/* Enhanced Log Event Modal */}
-      <AnimatePresence>
-        {showLogModal && (
-          <>
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              onClick={() => {
-                setShowLogModal(false);
-                setEditingEvent(null);
-              }}
-              className="absolute inset-0 bg-black/40 z-50"
-            />
+      {createPortal(
+        <AnimatePresence>
+          {showLogModal && (
+            <>
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                onClick={() => {
+                  setShowLogModal(false);
+                  setEditingEvent(null);
+                }}
+                className="fixed inset-0 bg-black/40 z-[60]"
+              />
 
-            <motion.div
-              initial={{ opacity: 0, y: 100 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: 100 }}
-              className="absolute bottom-0 left-0 right-0 bg-white rounded-t-[32px] z-50 max-h-[90vh] overflow-y-auto"
-            >
+              <motion.div
+                initial={{ opacity: 0, scale: 0.9, y: 20 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.9, y: 20 }}
+                className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[90%] max-w-md bg-white rounded-[32px] z-[70] max-h-[85vh] overflow-y-auto shadow-2xl"
+              >
               <div className="p-6 pb-8">
                 {/* Header */}
                 <div className="flex items-center justify-between mb-6">
@@ -1517,6 +1890,162 @@ export function CGMTab({}: CGMTabProps = {}) {
                   </motion.div>
                 )}
               </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>,
+      document.body
+      )}
+
+      {/* Meal Comparison Modal */}
+      <AnimatePresence>
+        {showComparisonModal && comparisonMeal1 && comparisonMeal2 && (
+          <>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[60] flex items-center justify-center p-4"
+              onClick={() => setShowComparisonModal(false)}
+            >
+              <motion.div
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.9 }}
+                onClick={(e) => e.stopPropagation()}
+                className="bg-white rounded-3xl shadow-2xl w-full max-w-lg max-h-[85vh] overflow-y-auto"
+              >
+              {/* Header */}
+              <div className="sticky top-0 bg-gradient-to-r from-blue-600 to-purple-600 text-white p-6 rounded-t-3xl">
+                <button
+                  onClick={() => setShowComparisonModal(false)}
+                  className="absolute top-4 right-4 w-8 h-8 flex items-center justify-center rounded-full bg-white/20 hover:bg-white/30 transition"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+                <div className="flex items-center gap-3 mb-2">
+                  <Scale className="w-6 h-6" />
+                  <h2 className="text-xl font-bold">Meal Comparison</h2>
+                </div>
+                <p className="text-sm opacity-90">Comparing your best vs worst meals from all logged days</p>
+              </div>
+
+              {/* Comparison Content */}
+              <div className="p-6 space-y-6">
+                {/* Score Comparison */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="text-center">
+                    <div className="w-20 h-20 mx-auto rounded-full bg-green-100 flex items-center justify-center mb-3 border-4 border-green-500">
+                      <span className="text-2xl font-bold text-green-700">{comparisonMeal1.score}</span>
+                    </div>
+                    <div className="text-xs font-bold text-green-700 mb-1">BEST PERFORMER</div>
+                    <h3 className="font-bold text-gray-900 text-sm">{comparisonMeal1.mealName}</h3>
+                    <p className="text-xs text-gray-500 capitalize">{comparisonMeal1.mealType} • {comparisonMeal1.time}</p>
+                    <p className="text-xs text-gray-400 mt-1">{comparisonMeal1.date}</p>
+                  </div>
+
+                  <div className="text-center">
+                    <div className="w-20 h-20 mx-auto rounded-full bg-amber-100 flex items-center justify-center mb-3 border-4 border-amber-500">
+                      <span className="text-2xl font-bold text-amber-700">{comparisonMeal2.score}</span>
+                    </div>
+                    <div className="text-xs font-bold text-amber-700 mb-1">NEEDS WORK</div>
+                    <h3 className="font-bold text-gray-900 text-sm">{comparisonMeal2.mealName}</h3>
+                    <p className="text-xs text-gray-500 capitalize">{comparisonMeal2.mealType} • {comparisonMeal2.time}</p>
+                    <p className="text-xs text-gray-400 mt-1">{comparisonMeal2.date}</p>
+                  </div>
+                </div>
+
+                {/* Detailed Metrics */}
+                <div className="space-y-3">
+                  <h4 className="text-sm font-bold text-gray-900">Performance Breakdown</h4>
+
+                  {/* Glucose Increase */}
+                  <div className="bg-gray-50 rounded-xl p-4">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-sm font-medium text-gray-700">Peak Glucose Rise</span>
+                      <TrendingUp className="w-4 h-4 text-gray-400" />
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <div className="text-2xl font-bold text-green-700">+{comparisonMeal1.glucoseIncrease}</div>
+                        <div className="text-xs text-gray-500">mg/dL</div>
+                      </div>
+                      <div>
+                        <div className="text-2xl font-bold text-amber-700">+{comparisonMeal2.glucoseIncrease}</div>
+                        <div className="text-xs text-gray-500">mg/dL</div>
+                      </div>
+                    </div>
+                    <div className="mt-2 text-xs text-gray-600">
+                      <strong>Lower is better</strong> - Ideal: &lt;30 mg/dL
+                    </div>
+                  </div>
+
+                  {/* Time to Peak */}
+                  <div className="bg-gray-50 rounded-xl p-4">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-sm font-medium text-gray-700">Time to Peak</span>
+                      <Clock className="w-4 h-4 text-gray-400" />
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <div className="text-2xl font-bold text-green-700">{comparisonMeal1.timeToPeak}</div>
+                        <div className="text-xs text-gray-500">minutes</div>
+                      </div>
+                      <div>
+                        <div className="text-2xl font-bold text-amber-700">{comparisonMeal2.timeToPeak}</div>
+                        <div className="text-xs text-gray-500">minutes</div>
+                      </div>
+                    </div>
+                    <div className="mt-2 text-xs text-gray-600">
+                      <strong>Ideal: 30-60 min</strong> - Gradual rise is better
+                    </div>
+                  </div>
+
+                  {/* Recovery Time */}
+                  <div className="bg-gray-50 rounded-xl p-4">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-sm font-medium text-gray-700">Recovery Time</span>
+                      <Activity className="w-4 h-4 text-gray-400" />
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <div className="text-2xl font-bold text-green-700">{comparisonMeal1.timeToBaseline}</div>
+                        <div className="text-xs text-gray-500">minutes</div>
+                      </div>
+                      <div>
+                        <div className="text-2xl font-bold text-amber-700">{comparisonMeal2.timeToBaseline}</div>
+                        <div className="text-xs text-gray-500">minutes</div>
+                      </div>
+                    </div>
+                    <div className="mt-2 text-xs text-gray-600">
+                      <strong>Faster is better</strong> - Ideal: &lt;120 min
+                    </div>
+                  </div>
+                </div>
+
+                {/* Winner Banner */}
+                <div className="bg-gradient-to-r from-green-500 to-emerald-600 rounded-xl p-4 text-white">
+                  <div className="flex items-center gap-3">
+                    <Award className="w-8 h-8" />
+                    <div>
+                      <div className="text-xs font-bold opacity-90">BETTER CHOICE</div>
+                      <div className="text-lg font-bold">{comparisonMeal1.mealName}</div>
+                      <p className="text-xs opacity-90 mt-1">
+                        {comparisonMeal1.score - comparisonMeal2.score} points better • Lower glucose impact • {comparisonMeal1.date}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Action Button */}
+                <button
+                  onClick={() => setShowComparisonModal(false)}
+                  className="w-full py-3 rounded-xl bg-gray-100 text-gray-700 hover:bg-gray-200 transition-colors font-semibold"
+                >
+                  Close Comparison
+                </button>
+              </div>
+              </motion.div>
             </motion.div>
           </>
         )}

@@ -1,0 +1,465 @@
+{
+  "reportMetadata": {
+    "month": "November 2025",
+    "dateRange": "Nov 1 - Nov 30, 2025",
+    "generatedDate": "2025-12-02",
+    "userId": "user_001",
+    "reportVersion": "1.0"
+  },
+
+  "overallMetrics": {
+    "avgTIR": 78,
+    "avgGlucose": 112,
+    "glucoseVariability": 28,
+    "totalReadings": 8640,
+    "activeHours": 720,
+    "dataCompleteness": 98.5,
+    "notes": "CV = Coefficient of Variation, measures glucose variability. Target <36%"
+  },
+
+  "weeklyTIR": [
+    {
+      "week": "Week 1",
+      "weekNumber": 1,
+      "dateRange": "Nov 1-7",
+      "tir": 72,
+      "avgGlucose": 118,
+      "readings": 2016
+    },
+    {
+      "week": "Week 2",
+      "weekNumber": 2,
+      "dateRange": "Nov 8-14",
+      "tir": 76,
+      "avgGlucose": 114,
+      "readings": 2016
+    },
+    {
+      "week": "Week 3",
+      "weekNumber": 3,
+      "dateRange": "Nov 15-21",
+      "tir": 81,
+      "avgGlucose": 108,
+      "readings": 2016
+    },
+    {
+      "week": "Week 4",
+      "weekNumber": 4,
+      "dateRange": "Nov 22-30",
+      "tir": 83,
+      "avgGlucose": 106,
+      "readings": 2592
+    }
+  ],
+
+  "timeInRanges": {
+    "veryLow": {
+      "percentage": 2,
+      "range": "<54 mg/dL",
+      "minutes": 864,
+      "events": 12,
+      "severity": "dangerous"
+    },
+    "low": {
+      "percentage": 4,
+      "range": "54-69 mg/dL",
+      "minutes": 1728,
+      "events": 28,
+      "severity": "caution"
+    },
+    "target": {
+      "percentage": 78,
+      "range": "70-180 mg/dL",
+      "minutes": 33696,
+      "events": null,
+      "severity": "optimal"
+    },
+    "high": {
+      "percentage": 12,
+      "range": "181-250 mg/dL",
+      "minutes": 5184,
+      "events": 45,
+      "severity": "moderate"
+    },
+    "veryHigh": {
+      "percentage": 4,
+      "range": ">250 mg/dL",
+      "minutes": 1728,
+      "events": 18,
+      "severity": "high"
+    }
+  },
+
+  "dailyPatterns": [
+    {
+      "hour": "12AM",
+      "timeRange": "00:00-00:59",
+      "avgGlucose": 102,
+      "readings": 124,
+      "stdDev": 15,
+      "period": "overnight"
+    },
+    {
+      "hour": "3AM",
+      "timeRange": "03:00-03:59",
+      "avgGlucose": 98,
+      "readings": 124,
+      "stdDev": 12,
+      "period": "overnight"
+    },
+    {
+      "hour": "6AM",
+      "timeRange": "06:00-06:59",
+      "avgGlucose": 115,
+      "readings": 124,
+      "stdDev": 22,
+      "period": "morning"
+    },
+    {
+      "hour": "9AM",
+      "timeRange": "09:00-09:59",
+      "avgGlucose": 128,
+      "readings": 124,
+      "stdDev": 28,
+      "period": "morning"
+    },
+    {
+      "hour": "12PM",
+      "timeRange": "12:00-12:59",
+      "avgGlucose": 135,
+      "readings": 124,
+      "stdDev": 32,
+      "period": "afternoon"
+    },
+    {
+      "hour": "3PM",
+      "timeRange": "15:00-15:59",
+      "avgGlucose": 118,
+      "readings": 124,
+      "stdDev": 24,
+      "period": "afternoon"
+    },
+    {
+      "hour": "6PM",
+      "timeRange": "18:00-18:59",
+      "avgGlucose": 142,
+      "readings": 124,
+      "stdDev": 35,
+      "period": "evening"
+    },
+    {
+      "hour": "9PM",
+      "timeRange": "21:00-21:59",
+      "avgGlucose": 108,
+      "readings": 124,
+      "stdDev": 18,
+      "period": "evening"
+    }
+  ],
+
+  "patterns": {
+    "morningSpikes": {
+      "detected": true,
+      "frequency": "18 out of 30 days",
+      "frequencyPercentage": 60,
+      "avgIncrease": "+35 mg/dL",
+      "avgIncreaseValue": 35,
+      "timeWindow": "6:00 AM - 8:00 AM",
+      "severity": "moderate",
+      "possibleCauses": [
+        "Dawn phenomenon (natural cortisol rise)",
+        "Insufficient overnight insulin",
+        "High-carb evening snacks"
+      ],
+      "impact": "Contributes to 15% of time above range"
+    },
+    "postMealSpikes": {
+      "breakfast": {
+        "avg": "+48 mg/dL",
+        "avgValue": 48,
+        "peak": "30-45 min",
+        "peakMinutes": 37.5,
+        "returnToBaseline": "120 min",
+        "severity": "moderate"
+      },
+      "lunch": {
+        "avg": "+52 mg/dL",
+        "avgValue": 52,
+        "peak": "45-60 min",
+        "peakMinutes": 52.5,
+        "returnToBaseline": "135 min",
+        "severity": "moderate"
+      },
+      "dinner": {
+        "avg": "+65 mg/dL",
+        "avgValue": 65,
+        "peak": "60-75 min",
+        "peakMinutes": 67.5,
+        "returnToBaseline": "180 min",
+        "severity": "high"
+      }
+    },
+    "overnightStability": {
+      "rating": "excellent",
+      "avgVariation": "±12 mg/dL",
+      "avgVariationValue": 12,
+      "hypoglycemiaEvents": 2,
+      "timeInRange": 92,
+      "avgGlucose": 98,
+      "notes": "Excellent overnight control with minimal variability"
+    },
+    "afternoonDips": {
+      "detected": true,
+      "frequency": "12 out of 30 days",
+      "frequencyPercentage": 40,
+      "avgDrop": "-28 mg/dL",
+      "avgDropValue": 28,
+      "timeWindow": "3:00 PM - 4:00 PM",
+      "severity": "low",
+      "possibleCauses": [
+        "Long gap since lunch",
+        "Delayed insulin action",
+        "Physical activity"
+      ]
+    }
+  },
+
+  "behaviors": {
+    "sleep": {
+      "avgHours": 7.2,
+      "qualityScore": 7.8,
+      "qualityScoreOutOf": 10,
+      "correlation": "Good sleep (>7h) linked to 15% better TIR next day",
+      "correlationStrength": "strong",
+      "correlationValue": 0.73,
+      "bestNights": "Nov 3, 8, 15, 22 - All had >80% TIR following day",
+      "worstNights": "Nov 5, 12, 19 - Poor sleep (<6h) led to higher morning glucose",
+      "recommendations": [
+        "Maintain 7-8 hours of sleep consistently",
+        "Go to bed around same time each night",
+        "Avoid late evening high-carb snacks"
+      ]
+    },
+    "meals": {
+      "breakfastTiming": "7:30 AM avg",
+      "lunchTiming": "12:45 PM avg",
+      "dinnerTiming": "7:15 PM avg",
+      "mealConsistency": 68,
+      "mealConsistencyOutOf": 100,
+      "keyFindings": [
+        "Early breakfasts (before 8 AM) → 18% lower post-meal spikes",
+        "Late dinners (after 8 PM) → worse overnight glucose control",
+        "Meal spacing >4 hours → more stable glucose between meals"
+      ],
+      "recommendations": [
+        "Try to eat breakfast before 8 AM consistently",
+        "Finish dinner by 7 PM for better overnight control",
+        "Maintain 4-5 hour spacing between main meals"
+      ]
+    },
+    "exercise": {
+      "weeklyFrequency": 4.2,
+      "avgDuration": "35 minutes",
+      "avgDurationMinutes": 35,
+      "totalMinutes": 588,
+      "impact": "Exercise days showed 12% higher TIR",
+      "impactValue": 12,
+      "bestTime": "Morning exercise (7-9 AM) most effective",
+      "postExerciseWindow": "Improved glucose control for 4-6 hours after",
+      "postExerciseWindowHours": 5,
+      "exerciseTypes": {
+        "walking": 45,
+        "strength": 25,
+        "yoga": 15,
+        "cycling": 15
+      },
+      "recommendations": [
+        "Schedule 3-4 morning workouts per week",
+        "Even 20 minutes of walking shows benefits",
+        "Post-meal walks especially effective for dinner"
+      ]
+    },
+    "stress": {
+      "highStressDays": 8,
+      "highStressDaysPercentage": 26.7,
+      "avgGlucoseIncrease": "+18 mg/dL on high stress days",
+      "avgGlucoseIncreaseValue": 18,
+      "pattern": "Stress-related spikes typically in afternoon (2-5 PM)",
+      "correlationStrength": "moderate",
+      "correlationValue": 0.58,
+      "stressors": [
+        "Work deadlines",
+        "Poor sleep",
+        "Social situations"
+      ],
+      "recommendations": [
+        "Practice 5-min breathing exercises during stressful periods",
+        "Consider meditation or mindfulness app",
+        "Take short breaks during high-stress work periods"
+      ]
+    }
+  },
+
+  "recommendations": [
+    {
+      "id": "rec_001",
+      "category": "Morning Routine",
+      "priority": "high",
+      "insight": "Dawn phenomenon detected on 60% of days",
+      "action": "Try light exercise (10-min walk) within 30 minutes of waking",
+      "expectedImpact": "Could reduce morning spike by 15-20 mg/dL",
+      "estimatedImpactValue": 17.5,
+      "difficulty": "easy",
+      "timeRequired": "10-15 minutes daily",
+      "scientificBasis": "Morning physical activity improves insulin sensitivity and helps counteract cortisol-driven glucose rise"
+    },
+    {
+      "id": "rec_002",
+      "category": "Meal Timing",
+      "priority": "high",
+      "insight": "Dinner spikes are your largest post-meal excursions (+65 mg/dL avg)",
+      "action": "Eat dinner before 7 PM and consider a 15-min post-dinner walk",
+      "expectedImpact": "May reduce dinner spike by 20-25 mg/dL",
+      "estimatedImpactValue": 22.5,
+      "difficulty": "moderate",
+      "timeRequired": "15-20 minutes daily",
+      "scientificBasis": "Earlier dinner timing allows better glucose processing before sleep, and post-meal activity enhances glucose uptake"
+    },
+    {
+      "id": "rec_003",
+      "category": "Sleep Optimization",
+      "priority": "medium",
+      "insight": "Short sleep (<6.5h) correlates with 15% worse TIR next day",
+      "action": "Aim for 7-8 hours. Your best TIR days followed good sleep nights",
+      "expectedImpact": "Could improve overall TIR by 5-8%",
+      "estimatedImpactValue": 6.5,
+      "difficulty": "moderate",
+      "timeRequired": "Lifestyle adjustment",
+      "scientificBasis": "Sleep deprivation impairs insulin sensitivity and increases cortisol levels"
+    },
+    {
+      "id": "rec_004",
+      "category": "Exercise Strategy",
+      "priority": "medium",
+      "insight": "Morning exercise shows strongest glucose-lowering effect",
+      "action": "Schedule 3-4 morning workouts per week (even 20 minutes helps)",
+      "expectedImpact": "Potential TIR improvement of 8-12%",
+      "estimatedImpactValue": 10,
+      "difficulty": "moderate",
+      "timeRequired": "20-30 minutes, 3-4x/week",
+      "scientificBasis": "Morning exercise enhances insulin sensitivity throughout the day and helps counteract dawn phenomenon"
+    },
+    {
+      "id": "rec_005",
+      "category": "Afternoon Management",
+      "priority": "low",
+      "insight": "Glucose dips around 3-4 PM on 40% of days",
+      "action": "Small protein-rich snack at 2:30 PM may prevent afternoon drops",
+      "expectedImpact": "Reduce low glucose events by 30-40%",
+      "estimatedImpactValue": 35,
+      "difficulty": "easy",
+      "timeRequired": "5 minutes daily",
+      "scientificBasis": "Protein provides steady glucose release without causing spikes"
+    },
+    {
+      "id": "rec_006",
+      "category": "Stress Management",
+      "priority": "medium",
+      "insight": "High stress days show +18 mg/dL average glucose",
+      "action": "Try 5-min breathing exercises during stressful periods",
+      "expectedImpact": "May reduce stress-related glucose elevation by 10-15 mg/dL",
+      "estimatedImpactValue": 12.5,
+      "difficulty": "easy",
+      "timeRequired": "5 minutes as needed",
+      "scientificBasis": "Stress reduction lowers cortisol and adrenaline, which directly affect glucose levels"
+    }
+  ],
+
+  "highlights": [
+    {
+      "id": "highlight_001",
+      "text": "TIR improved from 72% to 83% over the month - excellent progress! 📈",
+      "category": "progress",
+      "importance": "high"
+    },
+    {
+      "id": "highlight_002",
+      "text": "Overnight glucose control is excellent (±12 mg/dL variation)",
+      "category": "stability",
+      "importance": "high"
+    },
+    {
+      "id": "highlight_003",
+      "text": "You've reduced hypoglycemia events by 40% vs last month",
+      "category": "safety",
+      "importance": "high"
+    },
+    {
+      "id": "highlight_004",
+      "text": "Exercise consistency increased - from 2.8 to 4.2 days/week",
+      "category": "behavior",
+      "importance": "medium"
+    }
+  ],
+
+  "improvements": [
+    {
+      "id": "improvement_001",
+      "text": "Morning spikes remain the biggest opportunity for optimization",
+      "category": "pattern",
+      "priority": "high",
+      "estimatedImpact": "15-20% TIR improvement possible"
+    },
+    {
+      "id": "improvement_002",
+      "text": "Dinner timing and composition could be adjusted for better evening control",
+      "category": "meal_timing",
+      "priority": "high",
+      "estimatedImpact": "10-15% TIR improvement possible"
+    },
+    {
+      "id": "improvement_003",
+      "text": "Consider more consistent meal timing on weekends",
+      "category": "consistency",
+      "priority": "medium",
+      "estimatedImpact": "5-8% TIR improvement possible"
+    }
+  ],
+
+  "comparisonToPreviousMonth": {
+    "tirChange": "+11%",
+    "tirChangeValue": 11,
+    "avgGlucoseChange": "-8 mg/dL",
+    "avgGlucoseChangeValue": -8,
+    "hypoglycemiaChange": "-40%",
+    "hypoglycemiaChangeValue": -40,
+    "hyperglycemiaChange": "-15%",
+    "hyperglycemiaChangeValue": -15,
+    "exerciseFrequencyChange": "+1.4 days/week",
+    "exerciseFrequencyChangeValue": 1.4,
+    "trend": "improving"
+  },
+
+  "actionPlan": {
+    "immediate": [
+      "Start 10-min morning walk routine",
+      "Move dinner time to before 7 PM"
+    ],
+    "shortTerm": [
+      "Add protein-rich afternoon snack",
+      "Improve sleep schedule (aim for 7-8h)"
+    ],
+    "longTerm": [
+      "Build consistent morning exercise habit",
+      "Develop stress management routine"
+    ]
+  },
+
+  "nextMonthGoals": {
+    "tirTarget": 85,
+    "avgGlucoseTarget": 105,
+    "hypoglycemiaTarget": "<1%",
+    "exerciseTarget": "5 days/week",
+    "sleepTarget": "7.5 hours/night"
+  }
+}

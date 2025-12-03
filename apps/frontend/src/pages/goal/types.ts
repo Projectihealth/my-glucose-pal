@@ -24,6 +24,7 @@ export interface Habit {
   streak: number;
   emoji?: string;
   uploaded_images?: string[];
+  notificationTime?: string; // Time in HH:MM format (24-hour)
 }
 
 export interface WeeklyData {

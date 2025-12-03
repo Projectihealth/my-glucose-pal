@@ -28,6 +28,7 @@ const CgmFoundations = lazy(() => import("./pages/articles/CgmFoundations"));
 const NutritionPlaybook = lazy(() => import("./pages/articles/NutritionPlaybook"));
 const UserGuide = lazy(() => import("./pages/articles/UserGuide").then(m => ({ default: m.UserGuide })));
 const WeightLossStrategies = lazy(() => import("./pages/articles/WeightLossStrategies"));
+const MonthlyCGMReport = lazy(() => import("./pages/MonthlyCGMReport"));
 const OliviaHome = lazy(() => import("./pages/olivia/OliviaHome"));
 const ConversationDetail = lazy(() => import("./pages/olivia/ConversationDetail"));
 const VoiceChat = lazy(() => import("./pages/olivia/VoiceChat"));
@@ -155,6 +156,7 @@ const App = () => {
                     <Route path="/learn-more/nutrition-playbook" element={<NutritionPlaybook />} />
                     <Route path="/learn-more/user-guide" element={<UserGuide />} />
                     <Route path="/learn-more/weight-loss" element={<WeightLossStrategies />} />
+                    <Route path="/monthly-report" element={<MonthlyCGMReport />} />
                     <Route path="/community" element={<Community />} />
                     <Route path="/profile" element={<Profile />} />
                     {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}

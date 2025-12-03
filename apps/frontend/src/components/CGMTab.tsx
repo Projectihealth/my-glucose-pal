@@ -1515,12 +1515,13 @@ export function CGMTab({}: CGMTabProps = {}) {
                 className="fixed inset-0 bg-black/40 z-[60]"
               />
 
-              <motion.div
-                initial={{ opacity: 0, scale: 0.9, y: 20 }}
-                animate={{ opacity: 1, scale: 1, y: 0 }}
-                exit={{ opacity: 0, scale: 0.9, y: 20 }}
-                className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[90%] max-w-md bg-white rounded-[32px] z-[70] max-h-[85vh] overflow-y-auto shadow-2xl"
-              >
+              <div className="fixed inset-0 z-[70] flex items-center justify-center p-4">
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.9, y: 20 }}
+                  animate={{ opacity: 1, scale: 1, y: 0 }}
+                  exit={{ opacity: 0, scale: 0.9, y: 20 }}
+                  className="w-full max-w-md bg-white rounded-[32px] max-h-[85vh] overflow-y-auto shadow-2xl"
+                >
               <div className="p-6 pb-8">
                 {/* Header */}
                 <div className="flex items-center justify-between mb-6">
@@ -1891,6 +1892,7 @@ export function CGMTab({}: CGMTabProps = {}) {
                 )}
               </div>
             </motion.div>
+          </div>
           </>
         )}
       </AnimatePresence>,

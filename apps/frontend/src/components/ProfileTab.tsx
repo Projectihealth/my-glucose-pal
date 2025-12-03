@@ -1091,12 +1091,12 @@ export function ProfileTab() {
               }}
               disabled={isLoadingUsers}
             >
-              <SelectTrigger className="rounded-2xl">
+              <SelectTrigger className="rounded-2xl h-12">
                 <SelectValue
                   placeholder={isLoadingUsers ? "Loading users..." : "Select a saved user"}
                 />
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent className="z-[100]" position="popper" sideOffset={8}>
                 {availableUsers.map((user) => (
                   <SelectItem key={user.user_id} value={user.user_id}>
                     {user.user_id}

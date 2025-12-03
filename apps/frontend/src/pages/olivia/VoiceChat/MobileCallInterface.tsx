@@ -123,29 +123,29 @@ export function MobileCallInterface({ onBack, onCallEnded }: MobileCallInterface
   };
 
   return (
-    <div className="min-h-screen flex flex-col bg-gradient-to-b from-slate-900 to-slate-800 text-white relative">
+    <div className="min-h-screen flex flex-col bg-gradient-to-b from-blue-100 via-blue-50 to-cyan-50 text-gray-900 relative">
       {/* Header */}
       <div className="px-6 pt-6 pb-4">
         <div className="flex items-center justify-between mb-2">
-          <div className="text-sm text-gray-400">Call Duration</div>
-          <div className="px-3 py-1 bg-red-500/20 text-red-400 rounded-full text-sm flex items-center gap-2">
+          <div className="text-sm text-blue-700">Call Duration</div>
+          <div className="px-3 py-1 bg-red-500/20 text-red-600 rounded-full text-sm flex items-center gap-2">
             <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></div>
             Recording
           </div>
         </div>
-        <div className="text-2xl text-white tabular-nums">{formatTime(duration)}</div>
+        <div className="text-2xl text-gray-900 tabular-nums">{formatTime(duration)}</div>
       </div>
 
       {/* Main Content Area - Centered */}
       <div className="flex-1 flex flex-col items-center justify-center px-6 py-8">
         {/* Status Messages */}
         {callStatus.status === 'connecting' && (
-          <div className="text-center text-gray-400 text-sm py-4 mb-4">
+          <div className="text-center text-blue-600 text-sm py-4 mb-4">
             Connecting to Olivia...
           </div>
         )}
         {callStatus.status === 'error' && (
-          <div className="text-center text-red-400 text-sm py-4 px-4 bg-red-500/20 rounded-lg mb-4">
+          <div className="text-center text-red-600 text-sm py-4 px-4 bg-red-500/20 rounded-lg mb-4">
             {callStatus.error}
           </div>
         )}
@@ -161,10 +161,10 @@ export function MobileCallInterface({ onBack, onCallEnded }: MobileCallInterface
             {[...Array(3)].map((_, i) => (
               <motion.div
                 key={i}
-                className="absolute w-32 h-32 rounded-full border-2 border-blue-400/30"
+                className="absolute w-32 h-32 rounded-full border-2 border-blue-400/50"
                 animate={{
                   scale: [1, 1.5, 2],
-                  opacity: [0.5, 0.3, 0],
+                  opacity: [0.6, 0.3, 0],
                 }}
                 transition={{
                   duration: 3,
@@ -178,10 +178,10 @@ export function MobileCallInterface({ onBack, onCallEnded }: MobileCallInterface
 
           {/* Pulsing glow */}
           <motion.div
-            className="absolute w-40 h-40 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full blur-3xl"
+            className="absolute w-40 h-40 bg-gradient-to-r from-blue-300 to-cyan-300 rounded-full blur-3xl"
             animate={{
               scale: [1, 1.2, 1],
-              opacity: [0.3, 0.5, 0.3],
+              opacity: [0.5, 0.7, 0.5],
             }}
             transition={{
               duration: 2,
@@ -202,7 +202,7 @@ export function MobileCallInterface({ onBack, onCallEnded }: MobileCallInterface
               ease: "easeInOut"
             }}
           >
-            <div className="w-32 h-32 rounded-full overflow-hidden border-4 border-white/20 shadow-2xl">
+            <div className="w-32 h-32 rounded-full overflow-hidden border-4 border-white shadow-2xl shadow-blue-500/20">
               <ImageWithFallback
                 // Image file is located at: apps/frontend/public/images/olivia-nurse.png
                 src="/images/olivia-nurse.png"
@@ -213,7 +213,7 @@ export function MobileCallInterface({ onBack, onCallEnded }: MobileCallInterface
 
             {/* Active speaking indicator */}
             <motion.div
-              className="absolute -bottom-2 left-1/2 -translate-x-1/2 px-3 py-1 bg-gradient-to-r from-blue-500 to-blue-600 rounded-full text-xs flex items-center gap-1.5 shadow-lg"
+              className="absolute -bottom-2 left-1/2 -translate-x-1/2 px-3 py-1 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-full text-xs flex items-center gap-1.5 shadow-lg shadow-blue-500/30 text-white"
               animate={{
                 scale: isAgentSpeaking ? [1, 1.1, 1] : 1,
               }}
@@ -230,8 +230,8 @@ export function MobileCallInterface({ onBack, onCallEnded }: MobileCallInterface
 
         {/* Session Title */}
         <div className="text-center mb-8">
-          <div className="text-lg text-white/90">Care Assistant</div>
-          <div className="text-sm text-gray-400 mt-1">Daily Check-in</div>
+          <div className="text-lg text-gray-900">Care Assistant</div>
+          <div className="text-sm text-blue-600 mt-1">Daily Check-in</div>
         </div>
 
         {/* Live Caption - Current Message */}
@@ -243,14 +243,23 @@ export function MobileCallInterface({ onBack, onCallEnded }: MobileCallInterface
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -10 }}
-                className="bg-black/40 backdrop-blur-md rounded-2xl p-4 border border-white/10"
+                className="relative bg-gradient-to-br from-white/80 via-blue-50/80 to-cyan-50/80 backdrop-blur-xl rounded-2xl p-4 border border-blue-300/50 shadow-xl shadow-blue-300/30 overflow-hidden"
               >
-                <div className="text-xs text-gray-400 mb-1">
-                  {currentMessage.speaker === 'coach' ? 'Olivia (Coach)' : userInfo.name}
+                {/* Decorative gradient overlay */}
+                <div className="absolute inset-0 bg-gradient-to-br from-blue-400/5 via-transparent to-cyan-400/5 pointer-events-none"></div>
+                
+                {/* Inner glow effect */}
+                <div className="absolute inset-0 rounded-2xl border border-white/40 pointer-events-none"></div>
+                
+                <div className="relative z-10">
+                  <div className="text-xs text-blue-600 mb-1 flex items-center gap-1.5">
+                    <div className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse"></div>
+                    {currentMessage.speaker === 'coach' ? 'Olivia (Coach)' : userInfo.name}
+                  </div>
+                  <p className="text-sm text-gray-900 leading-relaxed">
+                    {currentMessage.text}
+                  </p>
                 </div>
-                <p className="text-sm text-white leading-relaxed">
-                  {currentMessage.text}
-                </p>
               </motion.div>
             )}
           </AnimatePresence>
@@ -260,7 +269,7 @@ export function MobileCallInterface({ onBack, onCallEnded }: MobileCallInterface
       {/* Floating Transcript Button */}
       <Sheet open={isTranscriptOpen} onOpenChange={setIsTranscriptOpen}>
         <SheetTrigger asChild>
-          <button className="fixed bottom-24 right-6 w-14 h-14 bg-white/10 backdrop-blur-md border border-white/20 rounded-full flex items-center justify-center text-white hover:bg-white/20 transition-colors shadow-lg">
+          <button className="fixed bottom-24 right-6 w-14 h-14 bg-white/90 backdrop-blur-md border border-blue-300 rounded-full flex items-center justify-center text-blue-600 hover:bg-white transition-colors shadow-lg shadow-blue-200/50">
             <MessageSquare className="w-5 h-5" />
           </button>
         </SheetTrigger>
@@ -289,7 +298,7 @@ export function MobileCallInterface({ onBack, onCallEnded }: MobileCallInterface
                   <div className={`inline-block px-4 py-3 rounded-2xl max-w-full break-words ${
                     msg.speaker === 'coach'
                       ? 'bg-gray-100 text-gray-900 rounded-tl-sm'
-                      : 'bg-gradient-to-br from-blue-500 to-blue-600 text-white rounded-tr-sm'
+                      : 'bg-gradient-to-br from-blue-500 to-cyan-500 text-white rounded-tr-sm'
                   }`}>
                     <p className="text-sm leading-relaxed">{msg.text}</p>
                   </div>
@@ -310,8 +319,8 @@ export function MobileCallInterface({ onBack, onCallEnded }: MobileCallInterface
             disabled={callStatus.status !== 'connected'}
             className={`w-16 h-16 rounded-full border-2 ${
               isMuted 
-                ? 'bg-red-50 border-red-300 text-red-600 hover:bg-red-100' 
-                : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50'
+                ? 'bg-red-50 border-red-400 text-red-600 hover:bg-red-100' 
+                : 'bg-white border-blue-300 text-gray-700 hover:bg-gray-50'
             }`}
           >
             {isMuted ? <MicOff className="w-6 h-6" /> : <Mic className="w-6 h-6" />}

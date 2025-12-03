@@ -37,7 +37,7 @@ const NUDGE_TEMPLATES: NudgeData[] = [
   },
   {
     id: 'water-reminder',
-    time: '15:00',
+    time: '15:25',
     title: '💧 Stay Hydrated',
     message: 'Drink a glass of water and check your glucose',
     icon: Droplet,
@@ -47,7 +47,7 @@ const NUDGE_TEMPLATES: NudgeData[] = [
   },
   {
     id: 'exercise-reminder',
-    time: '17:00',
+    time: '15:30',
     title: '💪 Exercise Time',
     message: 'Get active! 30 minutes of exercise will help manage your glucose',
     icon: Dumbbell,

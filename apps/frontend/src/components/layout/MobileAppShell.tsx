@@ -43,9 +43,9 @@ export const MobileAppShell = ({ children, className }: MobileAppShellProps) => 
     const fetchAgentPreference = async () => {
       try {
         const userId = getStoredUserId();
-        // 在本地开发环境强制使用本机后端，避免环境变量指到不可达的服务器
+        // Use relative URL in dev mode to leverage Vite proxy for mobile network access
         const backendUrl = import.meta.env.DEV
-          ? "http://localhost:5000"
+          ? ""
           : (import.meta.env.VITE_BACKEND_URL || "http://localhost:5000");
         const response = await fetch(`${backendUrl}/api/user/${userId}`);
         if (response.ok) {

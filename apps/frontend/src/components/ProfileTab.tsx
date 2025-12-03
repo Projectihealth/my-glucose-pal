@@ -110,8 +110,9 @@ export function ProfileTab() {
   const [manualUserId, setManualUserId] = useState("");
   const [isLoadingUsers, setIsLoadingUsers] = useState(false);
 
+  // Use relative URL in dev mode to leverage Vite proxy for mobile network access
   const backendUrl = import.meta.env.DEV
-    ? "http://localhost:5000"
+    ? ""  // Empty string uses relative paths, letting Vite proxy handle it
     : (import.meta.env.VITE_BACKEND_URL || "http://localhost:5000");
 
   useEffect(() => {
@@ -150,8 +151,9 @@ export function ProfileTab() {
     const fetchUsers = async () => {
       try {
         setIsLoadingUsers(true);
-        const backendUrl = import.meta.env.VITE_BACKEND_URL || "http://localhost:5000";
-        const response = await fetch(`${backendUrl}/api/users`);
+        // Use relative URL in dev mode to leverage Vite proxy
+        const usersBackendUrl = import.meta.env.DEV ? "" : (import.meta.env.VITE_BACKEND_URL || "http://localhost:5000");
+        const response = await fetch(`${usersBackendUrl}/api/users`);
         if (response.ok) {
           const users = await response.json();
           setAvailableUsers(users);

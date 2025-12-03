@@ -4,7 +4,9 @@
  * This service handles all API calls related to habits/goals management.
  */
 
-const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:5000';
+const BACKEND_URL = import.meta.env.DEV
+  ? 'http://localhost:5000'
+  : (import.meta.env.VITE_BACKEND_URL || 'http://localhost:5000');
 
 export interface Habit {
   id: string;

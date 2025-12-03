@@ -13,19 +13,13 @@ import {
 import { cn } from "@/lib/utils";
 import { useLocation, useNavigate } from "react-router-dom";
 import { APP_DIALOG_PORTAL_ID } from "@/lib/dom";
+import { getStoredUserId, USER_ID_CHANGE_EVENT } from "@/utils/userUtils";
+import { getAgentConfig } from "@/config/agentConfig";
 
 interface MobileAppShellProps {
   children: ReactNode;
   className?: string;
 }
-
-const navItems = [
-  { label: "My CGM", icon: LineChart, path: "/overview" },
-  { label: "Olivia", icon: MessageCircle, path: "/coach" },
-  { label: "My Goals", icon: Target, path: "/goal" },
-  { label: "Community", icon: Users, path: "/community" },
-  { label: "Profile", icon: CircleUserRound, path: "/profile" },
-];
 
 const formatTime = () =>
   new Date().toLocaleTimeString([], {
@@ -40,8 +34,59 @@ export const MobileAppShell = ({ children, className }: MobileAppShellProps) => 
     const stored = localStorage.getItem('betaMode');
     return stored === 'true';
   });
+  const [agentName, setAgentName] = useState<string>("Olivia");
   const navigate = useNavigate();
   const location = useLocation();
+
+  // Fetch user's agent preference
+  useEffect(() => {
+    const fetchAgentPreference = async () => {
+      try {
+        const userId = getStoredUserId();
+        // 在本地开发环境强制使用本机后端，避免环境变量指到不可达的服务器
+        const backendUrl = import.meta.env.DEV
+          ? "http://localhost:5000"
+          : (import.meta.env.VITE_BACKEND_URL || "http://localhost:5000");
+        const response = await fetch(`${backendUrl}/api/user/${userId}`);
+        if (response.ok) {
+          const userData = await response.json();
+          const agentConfig = getAgentConfig(userData.agent_preference);
+          setAgentName(agentConfig.displayName);
+        }
+      } catch (error) {
+        console.error("Failed to fetch agent preference:", error);
+        // Keep default "Olivia"
+      }
+    };
+
+    fetchAgentPreference();
+
+    // Listen for user ID changes
+    const handleUserChange = () => {
+      fetchAgentPreference();
+    };
+    window.addEventListener(USER_ID_CHANGE_EVENT, handleUserChange);
+
+    // Listen for agent preference changes
+    const handleAgentPreferenceChange = (event: any) => {
+      const agentConfig = getAgentConfig(event.detail?.agentPreference);
+      setAgentName(agentConfig.displayName);
+    };
+    window.addEventListener('agentPreferenceChanged', handleAgentPreferenceChange);
+
+    return () => {
+      window.removeEventListener(USER_ID_CHANGE_EVENT, handleUserChange);
+      window.removeEventListener('agentPreferenceChanged', handleAgentPreferenceChange);
+    };
+  }, []);
+
+  const navItems = [
+    { label: "My CGM", icon: LineChart, path: "/overview" },
+    { label: agentName, icon: MessageCircle, path: "/coach" },
+    { label: "My Goals", icon: Target, path: "/goal" },
+    { label: "Community", icon: Users, path: "/community" },
+    { label: "Profile", icon: CircleUserRound, path: "/profile" },
+  ];
 
   useEffect(() => {
     const interval = setInterval(() => setTime(formatTime()), 60_000);

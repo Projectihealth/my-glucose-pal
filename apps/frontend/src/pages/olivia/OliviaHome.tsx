@@ -3,10 +3,11 @@ import { useState, useEffect, useMemo, useRef } from 'react';
 import { Mic, Video, MessageCircle, Sparkles, ChevronDown, ChevronUp, Trash2 } from 'lucide-react';
 import { processConversations } from '../../utils/conversationHelpers';
 import { getStoredUserId, USER_ID_CHANGE_EVENT } from '@/utils/userUtils';
-import { useConversationHistory, usePrefetchConversationDetail } from '../../hooks/useConversations';
+import { conversationKeys, useConversationHistory, usePrefetchConversationDetail } from '../../hooks/useConversations';
 import { TabHeader } from '@/components/TabHeader';
 import { deleteConversation } from '../../services/conversationsApi';
 import { useQueryClient } from '@tanstack/react-query';
+import { getAgentConfig } from '@/config/agentConfig';
 
 function OliviaHome() {
   const navigate = useNavigate();
@@ -31,15 +32,52 @@ interface ProcessedConversation {
   color: string;
 }
 
+const HISTORY_LIMIT = 10;
+
 function OliviaTab({ onNavigate }: { onNavigate: (view: 'voice' | 'video' | 'text') => void }) {
   const [showChatModal, setShowChatModal] = useState(false);
   const [showAllHistory, setShowAllHistory] = useState(false);
   const [activeUserId, setActiveUserId] = useState(() => getStoredUserId());
+  const [agentName, setAgentName] = useState<string>("Olivia");
   const queryClient = useQueryClient();
-  
+
   // Use React Query hook for conversation history (with caching)
-  const { data, isLoading, error } = useConversationHistory(activeUserId, 10);
+  const { data, isLoading, error } = useConversationHistory(activeUserId, HISTORY_LIMIT);
   const prefetchDetail = usePrefetchConversationDetail();
+
+  // Fetch user's agent preference
+  useEffect(() => {
+    const fetchAgentPreference = async () => {
+      try {
+        const userId = getStoredUserId();
+        const backendUrl = import.meta.env.DEV
+          ? "http://localhost:5000"
+          : (import.meta.env.VITE_BACKEND_URL || "http://localhost:5000");
+        const response = await fetch(`${backendUrl}/api/user/${userId}`);
+        if (response.ok) {
+          const userData = await response.json();
+          const agentConfig = getAgentConfig(userData.agent_preference);
+          setAgentName(agentConfig.displayName);
+        }
+      } catch (error) {
+        console.error("Failed to fetch agent preference:", error);
+        // Keep default "Olivia"
+      }
+    };
+
+    fetchAgentPreference();
+
+    // Listen for agent preference changes
+    const handleAgentPreferenceChange = (event: any) => {
+      const agentConfig = getAgentConfig(event.detail?.agentPreference);
+      setAgentName(agentConfig.displayName);
+    };
+    window.addEventListener('agentPreferenceChanged', handleAgentPreferenceChange);
+
+    return () => {
+      window.removeEventListener('agentPreferenceChanged', handleAgentPreferenceChange);
+    };
+  }, []);
 
   // Process conversations data
   const conversationHistory = useMemo(() => {
@@ -47,18 +85,31 @@ function OliviaTab({ onNavigate }: { onNavigate: (view: 'voice' | 'video' | 'tex
     return processConversations(data.conversations);
   }, [data]);
 
-  // Handle conversation deletion
+  // Handle conversation deletion with optimistic update
   const handleDeleteConversation = async (conversationId: string) => {
     try {
+      // Optimistically update the UI immediately
+      queryClient.setQueryData(
+        conversationKeys.list(activeUserId, HISTORY_LIMIT),
+        (old: any) => {
+          if (!old?.conversations) return old;
+          return {
+            ...old,
+            conversations: old.conversations.filter((c: any) => c.id !== conversationId),
+          };
+        },
+      );
+
+      // Then delete from backend
       await deleteConversation(conversationId);
-      
-      // Invalidate and refetch conversation history
-      queryClient.invalidateQueries({ queryKey: ['conversationHistory', activeUserId] });
       
       console.log(`✅ Deleted conversation: ${conversationId}`);
     } catch (error) {
       console.error('Failed to delete conversation:', error);
       alert('Failed to delete conversation. Please try again.');
+      
+      // Revert the optimistic update on error
+      queryClient.invalidateQueries({ queryKey: conversationKeys.list(activeUserId, HISTORY_LIMIT) });
     }
   };
 
@@ -83,9 +134,9 @@ function OliviaTab({ onNavigate }: { onNavigate: (view: 'voice' | 'video' | 'tex
     <>
       <div className="px-6 space-y-6">
         <TabHeader
-          eyebrow="Olivia AI"
+          eyebrow={`${agentName} AI`}
           title="Your Personal Health Companion"
-          subtitle="Connect with Olivia for personalized health guidance and support."
+          subtitle={`Connect with ${agentName} for personalized health guidance and support.`}
         />
 
         {/* Main Chat Button */}
@@ -104,7 +155,7 @@ function OliviaTab({ onNavigate }: { onNavigate: (view: 'voice' | 'video' | 'tex
                 </div>
                 <div className="text-left">
                   <h2 className="text-gray-900 text-xl mb-1" style={{ fontWeight: 700 }}>
-                    Chat with Olivia
+                    Chat with {agentName}
                   </h2>
                   <p className="text-gray-500 text-sm">
                     Voice • Video • Text
@@ -161,7 +212,7 @@ function OliviaTab({ onNavigate }: { onNavigate: (view: 'voice' | 'video' | 'tex
                 No conversations yet
               </p>
               <p className="text-gray-400 text-xs">
-                Start chatting with Olivia to see your history here
+                Start chatting with {agentName} to see your history here
               </p>
             </div>
           ) : (
@@ -211,7 +262,7 @@ function OliviaTab({ onNavigate }: { onNavigate: (view: 'voice' | 'video' | 'tex
         <div className="bg-[#F5F7FA] rounded-3xl p-6 border border-gray-100 shadow-sm">
           <h3 className="text-[#5B7FF3] mb-4 flex items-center gap-2" style={{ fontWeight: 600 }}>
             <span>✨</span>
-            Olivia can help you with
+            {agentName} can help you with
           </h3>
           <div className="space-y-3 text-gray-600 text-sm">
             <div className="flex items-start gap-3">
@@ -237,6 +288,7 @@ function OliviaTab({ onNavigate }: { onNavigate: (view: 'voice' | 'video' | 'tex
       {/* Chat Mode Selection Modal */}
       {showChatModal && (
         <ChatModeModal
+          agentName={agentName}
           onClose={() => setShowChatModal(false)}
           onSelectMode={(mode) => {
             setShowChatModal(false);
@@ -470,9 +522,11 @@ function ConversationCard({
 }
 
 function ChatModeModal({
+  agentName,
   onClose,
   onSelectMode,
 }: {
+  agentName: string;
   onClose: () => void;
   onSelectMode: (mode: 'voice' | 'video' | 'text') => void;
 }) {
@@ -521,7 +575,7 @@ function ChatModeModal({
               Choose Chat Mode
             </h2>
             <p className="text-gray-500 text-center text-sm">
-              Select how you'd like to connect with Olivia
+              Select how you'd like to connect with {agentName}
             </p>
           </div>
 

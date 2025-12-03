@@ -61,9 +61,9 @@ class UserRepository(BaseRepository):
         """Update user information."""
         updates = []
         params = []
-        
+
         for field in ['name', 'gender', 'date_of_birth', 'health_goal',
-                     'conditions', 'cgm_device_type']:
+                     'conditions', 'cgm_device_type', 'agent_preference']:
             if field in kwargs:
                 updates.append(f'{field} = ?')
                 params.append(kwargs[field])

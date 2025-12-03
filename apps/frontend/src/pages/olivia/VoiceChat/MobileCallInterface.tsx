@@ -13,6 +13,7 @@ import {
 } from '@/components/ui/sheet';
 import { useRetellCall } from '../../../hooks/olivia/useRetellCall';
 import { getStoredUserId } from '@/utils/userUtils';
+import { getAgentConfig, type AgentType } from '@/config/agentConfig';
 
 interface MobileCallInterfaceProps {
   onBack: () => void;
@@ -36,6 +37,8 @@ export function MobileCallInterface({ onBack, onCallEnded }: MobileCallInterface
   const [isTranscriptOpen, setIsTranscriptOpen] = useState(false);
   const [messages, setMessages] = useState<Message[]>([]);
   const [userInfo, setUserInfo] = useState<UserInfo>({ name: 'User' });
+  const [agentName, setAgentName] = useState<string>("Olivia");
+  const [agentImage, setAgentImage] = useState<string>("/images/olivia-nurse.png");
 
   const {
     startCall,
@@ -49,11 +52,13 @@ export function MobileCallInterface({ onBack, onCallEnded }: MobileCallInterface
     isMuted: hookIsMuted,
   } = useRetellCall(userId);
 
-  // Fetch user info from backend
+  // Fetch user info and agent preference from backend
   useEffect(() => {
     const fetchUserInfo = async () => {
       try {
-        const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:5000';
+        const backendUrl = import.meta.env.DEV
+          ? 'http://localhost:5000'
+          : (import.meta.env.VITE_BACKEND_URL || 'http://localhost:5000');
         const response = await fetch(`${backendUrl}/api/user/${userId}`);
         if (response.ok) {
           const data = await response.json();
@@ -61,12 +66,29 @@ export function MobileCallInterface({ onBack, onCallEnded }: MobileCallInterface
             name: data.name || 'User',
             avatar: data.avatar_url,
           });
+
+          // Set agent configuration based on user preference
+          const agentConfig = getAgentConfig(data.agent_preference);
+          setAgentName(agentConfig.displayName);
+          setAgentImage(agentConfig.image);
         }
       } catch (error) {
         console.error('Failed to fetch user info:', error);
       }
     };
     fetchUserInfo();
+
+    // Listen for agent preference changes
+    const handleAgentPreferenceChange = (event: any) => {
+      const agentConfig = getAgentConfig(event.detail?.agentPreference);
+      setAgentName(agentConfig.displayName);
+      setAgentImage(agentConfig.image);
+    };
+    window.addEventListener('agentPreferenceChanged', handleAgentPreferenceChange);
+
+    return () => {
+      window.removeEventListener('agentPreferenceChanged', handleAgentPreferenceChange);
+    };
   }, [userId]);
 
   // Auto-start call when component mounts
@@ -90,19 +112,6 @@ export function MobileCallInterface({ onBack, onCallEnded }: MobileCallInterface
       setMessages(newMessages);
     }
   }, [transcript]);
-
-  // Add initial greeting message
-  useEffect(() => {
-    if (messages.length === 0) {
-      setMessages([
-        {
-          speaker: 'coach',
-          text: `Hi ${userInfo.name?.split(' ')[0] || 'there'}! I'm Olivia, your CGM health coach—here to support you on your health journey.`,
-          timestamp: 0,
-        },
-      ]);
-    }
-  }, [userInfo.name]);
 
   // Current speaking message (last message)
   const currentMessage = messages[messages.length - 1];
@@ -138,12 +147,7 @@ export function MobileCallInterface({ onBack, onCallEnded }: MobileCallInterface
 
       {/* Main Content Area - Centered */}
       <div className="flex-1 flex flex-col items-center justify-center px-6 py-8">
-        {/* Status Messages */}
-        {callStatus.status === 'connecting' && (
-          <div className="text-center text-blue-600 text-sm py-4 mb-4">
-            Connecting to Olivia...
-          </div>
-        )}
+        {/* Error Message */}
         {callStatus.status === 'error' && (
           <div className="text-center text-red-600 text-sm py-4 px-4 bg-red-500/20 rounded-lg mb-4">
             {callStatus.error}
@@ -204,10 +208,9 @@ export function MobileCallInterface({ onBack, onCallEnded }: MobileCallInterface
           >
             <div className="w-32 h-32 rounded-full overflow-hidden border-4 border-white shadow-2xl shadow-blue-500/20">
               <ImageWithFallback
-                // Image file is located at: apps/frontend/public/images/olivia-nurse.png
-                src="/images/olivia-nurse.png"
-                alt="Olivia - Your CGM Nurse Coach"
-                className="w-full h-full object-cover"
+                src={agentImage}
+                alt={`${agentName} - Your CGM Nurse Coach`}
+                className="w-full h-full object-cover object-top"
               />
             </div>
 
@@ -223,21 +226,61 @@ export function MobileCallInterface({ onBack, onCallEnded }: MobileCallInterface
               }}
             >
               <div className="w-1.5 h-1.5 bg-white rounded-full"></div>
-              <span>Olivia</span>
+              <span>{agentName}</span>
             </motion.div>
           </motion.div>
         </div>
 
         {/* Session Title */}
         <div className="text-center mb-8">
-          <div className="text-lg text-gray-900">Care Assistant</div>
+          <div className="text-lg text-gray-900">Health Companion</div>
           <div className="text-sm text-blue-600 mt-1">Daily Check-in</div>
         </div>
 
-        {/* Live Caption - Current Message */}
+        {/* Live Caption / Connection Status */}
         <div className="w-full max-w-md px-4">
           <AnimatePresence mode="wait">
-            {currentMessage && (
+            {callStatus.status === 'connecting' ? (
+              /* Connecting Animation */
+              <motion.div
+                key="connecting"
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.9 }}
+                className="text-center py-8"
+              >
+                {/* Pulsing dots animation */}
+                <div className="flex items-center justify-center gap-2 mb-4">
+                  {[0, 1, 2].map((i) => (
+                    <motion.div
+                      key={i}
+                      className="w-3 h-3 rounded-full bg-blue-500"
+                      animate={{
+                        scale: [1, 1.3, 1],
+                        opacity: [0.5, 1, 0.5],
+                      }}
+                      transition={{
+                        duration: 1.5,
+                        repeat: Infinity,
+                        delay: i * 0.2,
+                        ease: "easeInOut",
+                      }}
+                    />
+                  ))}
+                </div>
+                <motion.p
+                  className="text-blue-600 font-medium mb-1"
+                  animate={{ opacity: [0.7, 1, 0.7] }}
+                  transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
+                >
+                  Connecting to {agentName}...
+                </motion.p>
+                <p className="text-sm text-gray-500">
+                  {agentName} will be with you in a moment
+                </p>
+              </motion.div>
+            ) : currentMessage ? (
+              /* Live Caption - Current Message */
               <motion.div
                 key={currentMessage.timestamp}
                 initial={{ opacity: 0, y: 10 }}
@@ -247,19 +290,32 @@ export function MobileCallInterface({ onBack, onCallEnded }: MobileCallInterface
               >
                 {/* Decorative gradient overlay */}
                 <div className="absolute inset-0 bg-gradient-to-br from-blue-400/5 via-transparent to-cyan-400/5 pointer-events-none"></div>
-                
+
                 {/* Inner glow effect */}
                 <div className="absolute inset-0 rounded-2xl border border-white/40 pointer-events-none"></div>
-                
+
                 <div className="relative z-10">
                   <div className="text-xs text-blue-600 mb-1 flex items-center gap-1.5">
                     <div className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse"></div>
-                    {currentMessage.speaker === 'coach' ? 'Olivia (Coach)' : userInfo.name}
+                    {currentMessage.speaker === 'coach' ? `${agentName} (Coach)` : userInfo.name}
                   </div>
                   <p className="text-sm text-gray-900 leading-relaxed">
                     {currentMessage.text}
                   </p>
                 </div>
+              </motion.div>
+            ) : (
+              /* Waiting for first message */
+              <motion.div
+                key="waiting"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="text-center py-8"
+              >
+                <p className="text-sm text-gray-400">
+                  {agentName} is listening...
+                </p>
               </motion.div>
             )}
           </AnimatePresence>
@@ -287,12 +343,12 @@ export function MobileCallInterface({ onBack, onCallEnded }: MobileCallInterface
                 <div className={`w-8 h-8 rounded-full flex-shrink-0 flex items-center justify-center text-xs font-medium text-white ${
                   msg.speaker === 'coach' ? 'bg-gradient-to-br from-blue-500 to-blue-600' : 'bg-gradient-to-br from-purple-500 to-purple-600'
                 }`}>
-                  {msg.speaker === 'coach' ? 'O' : (userInfo.name?.[0] || 'U')}
+                  {msg.speaker === 'coach' ? agentName[0] : (userInfo.name?.[0] || 'U')}
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className={`flex items-center gap-2 mb-1 ${msg.speaker === 'patient' ? 'justify-end' : ''}`}>
                     <span className="text-xs font-medium text-gray-700">
-                      {msg.speaker === 'coach' ? 'Olivia (Coach)' : userInfo.name}
+                      {msg.speaker === 'coach' ? `${agentName} (Coach)` : userInfo.name}
                     </span>
                   </div>
                   <div className={`inline-block px-4 py-3 rounded-2xl max-w-full break-words ${

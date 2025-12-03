@@ -20,6 +20,8 @@ import { StreakModal } from './components/StreakModal';
 import { HabitDetailsModal } from './components/HabitDetailsModal';
 import { getStoredUserId } from '@/utils/userUtils';
 import * as habitsApi from '@/services/habitsApi';
+import { useHabits } from '@/hooks/useHabits';
+import { useQueryClient } from '@tanstack/react-query';
 
 // --- MOCK DATA ---
 const MOCK_HABITS: Habit[] = [
@@ -98,10 +100,36 @@ const LAST_WEEK_DAILY_STATS = [
 
 export default function App() {
   const userId = getStoredUserId();
+  const queryClient = useQueryClient();
   const [currentDate, setCurrentDate] = useState<Date>(new Date());
   const [habits, setHabits] = useState<Habit[]>([]);
   const [archivedHabits, setArchivedHabits] = useState<Habit[]>([]);
-  const [isLoadingHabits, setIsLoadingHabits] = useState(true);
+  const { data: fetchedHabits, isLoading: habitsLoading, error: habitsError } = useHabits(userId || '');
+
+  // Sync local state with cached habits
+  useEffect(() => {
+    if (fetchedHabits) {
+      setHabits(fetchedHabits);
+    }
+  }, [fetchedHabits]);
+
+  // Fallback to mock data if backend fails
+  useEffect(() => {
+    if (habitsError) {
+      console.error('Failed to load habits:', habitsError);
+      setHabits(MOCK_HABITS);
+    }
+  }, [habitsError]);
+
+  const syncHabits = (updater: (prev: Habit[]) => Habit[]) => {
+    setHabits(prev => {
+      const next = updater(prev);
+      if (userId) {
+        queryClient.setQueryData(['habits', userId], next);
+      }
+      return next;
+    });
+  };
 
   // AI Recommendations State
   const [recommendations, setRecommendations] = useState<Recommendation[]>([]);
@@ -144,25 +172,6 @@ export default function App() {
 
   // --- EFFECTS ---
 
-  // Load habits from API
-  useEffect(() => {
-    const loadHabits = async () => {
-      try {
-        setIsLoadingHabits(true);
-        const fetchedHabits = await habitsApi.getHabits(userId);
-        setHabits(fetchedHabits);
-      } catch (error) {
-        console.error('Failed to load habits:', error);
-        // Fallback to mock data on error
-        setHabits(MOCK_HABITS);
-      } finally {
-        setIsLoadingHabits(false);
-      }
-    };
-
-    loadHabits();
-  }, [userId]);
-
   // Fetch AI recommendations
   useEffect(() => {
     const fetchInsight = async () => {
@@ -196,7 +205,7 @@ export default function App() {
         await habitsApi.deleteHabitLog(id, selectedDateStr);
 
         // Update local state
-        setHabits(prev => prev.map(h => {
+        syncHabits(prev => prev.map(h => {
           if (h.id !== id) return h;
           const newLogs = { ...h.logs };
           delete newLogs[selectedDateStr];
@@ -210,7 +219,7 @@ export default function App() {
         });
 
         // Update local state
-        setHabits(prev => prev.map(h => {
+        syncHabits(prev => prev.map(h => {
           if (h.id !== id) return h;
           const newLogs = { ...h.logs };
           newLogs[selectedDateStr] = {
@@ -227,7 +236,7 @@ export default function App() {
   };
 
   const handleUpdateLog = (habitId: string, log: DailyLog | null) => {
-      setHabits(prev => prev.map(h => {
+      syncHabits(prev => prev.map(h => {
           if (h.id !== habitId) return h;
           const newLogs = { ...h.logs };
           if (log) {
@@ -247,7 +256,7 @@ export default function App() {
   const handleDeleteHabit = async (id: string) => {
     try {
       await habitsApi.deleteHabit(id);
-      setHabits(prev => prev.filter(h => h.id !== id));
+      syncHabits(prev => prev.filter(h => h.id !== id));
     } catch (error) {
       console.error('Failed to delete habit:', error);
       // TODO: Show error toast
@@ -294,7 +303,7 @@ export default function App() {
           frequency: habitData.frequency
         });
 
-        setHabits(prev => prev.map(h =>
+        syncHabits(prev => prev.map(h =>
           h.id === editingHabit.id
             ? { ...h, ...habitData }
             : h
@@ -317,7 +326,7 @@ export default function App() {
           logs: {},
           streak: 0
         };
-        setHabits(prev => [...prev, newHabit]);
+        syncHabits(prev => [...prev, newHabit]);
       }
       setIsAddModalOpen(false);
     } catch (error) {
@@ -329,7 +338,7 @@ export default function App() {
   const handleAddRecommendation = (rec: Recommendation) => {
     if (rec.kind === 'HABIT_SUGGESTION' && rec.habitData) {
         // This is still creating a 'new' habit from a template, so we don't use editingHabit state
-        setHabits(prev => [...prev, {
+        syncHabits(prev => [...prev, {
             id: `rec-${Date.now()}`,
             title: rec.title,
             description: rec.content,
@@ -352,7 +361,7 @@ export default function App() {
           alert("This habit is already in your list!");
           return;
       }
-      setHabits(prev => [...prev, habitToRestore]);
+      syncHabits(prev => [...prev, habitToRestore]);
       setArchivedHabits(prev => prev.filter(h => h.id !== habitToRestore.id));
   };
 

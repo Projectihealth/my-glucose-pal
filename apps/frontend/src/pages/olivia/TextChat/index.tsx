@@ -4,19 +4,54 @@
  * GPT-4o文本聊天界面
  */
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft } from 'lucide-react';
 import { useTextChat } from "../../../hooks/olivia/useTextChat";
 import { MessageList } from './MessageList';
 import { MessageInput } from './MessageInput';
+import { getStoredUserId } from '@/utils/userUtils';
+import { getAgentConfig } from '@/config/agentConfig';
 
 function TextChat() {
   const navigate = useNavigate();
-  const userId = import.meta.env.VITE_DEFAULT_USER_ID || 'user_001';
+  const userId = getStoredUserId();
+  const [agentName, setAgentName] = useState<string>("Olivia");
   const { messages, isLoading, error, sendMessage, endChat } = useTextChat(userId);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const endChatRef = useRef(endChat);
+
+  // Fetch user's agent preference
+  useEffect(() => {
+    const fetchAgentPreference = async () => {
+      try {
+        const backendUrl = import.meta.env.DEV
+          ? "http://localhost:5000"
+          : (import.meta.env.VITE_BACKEND_URL || "http://localhost:5000");
+        const response = await fetch(`${backendUrl}/api/user/${userId}`);
+        if (response.ok) {
+          const userData = await response.json();
+          const agentConfig = getAgentConfig(userData.agent_preference);
+          setAgentName(agentConfig.displayName);
+        }
+      } catch (error) {
+        console.error("Failed to fetch agent preference:", error);
+      }
+    };
+
+    fetchAgentPreference();
+
+    // Listen for agent preference changes
+    const handleAgentPreferenceChange = (event: any) => {
+      const agentConfig = getAgentConfig(event.detail?.agentPreference);
+      setAgentName(agentConfig.displayName);
+    };
+    window.addEventListener('agentPreferenceChanged', handleAgentPreferenceChange);
+
+    return () => {
+      window.removeEventListener('agentPreferenceChanged', handleAgentPreferenceChange);
+    };
+  }, [userId]);
 
   // 保持 endChatRef 最新
   useEffect(() => {
@@ -52,7 +87,7 @@ function TextChat() {
           <ArrowLeft className="w-6 h-6 text-gray-700" />
         </button>
         <div className="ml-3 flex-1">
-          <h1 className="text-gray-800 font-medium">Chat with Olivia</h1>
+          <h1 className="text-gray-800 font-medium">Chat with {agentName}</h1>
           <p className="text-xs text-gray-500">Your AI health companion</p>
         </div>
       </div>

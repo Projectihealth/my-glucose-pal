@@ -23,6 +23,7 @@ import {
   Settings,
   Camera,
   Sparkles,
+  Users,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -36,7 +37,8 @@ import {
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { TabHeader } from "./TabHeader";
-import { getStoredUserId, setStoredUserId } from "@/utils/userUtils";
+import { getStoredUserId, setStoredUserId, type User } from "@/utils/userUtils";
+import { getAgentConfig, type AgentType } from "@/config/agentConfig";
 
 interface UserProfile {
   firstName: string;
@@ -61,6 +63,7 @@ interface UserProfile {
   notificationsEnabled: boolean;
   language: string;
   timezone: string;
+  agentPreference: AgentType;
 }
 
 const DEFAULT_PROFILE: UserProfile = {
@@ -86,6 +89,7 @@ const DEFAULT_PROFILE: UserProfile = {
   notificationsEnabled: true,
   language: 'English',
   timezone: 'America/Los_Angeles',
+  agentPreference: 'olivia',
 };
 
 export function ProfileTab() {
@@ -106,7 +110,9 @@ export function ProfileTab() {
   const [manualUserId, setManualUserId] = useState("");
   const [isLoadingUsers, setIsLoadingUsers] = useState(false);
 
-  const backendUrl = import.meta.env.VITE_BACKEND_URL || "http://localhost:5000";
+  const backendUrl = import.meta.env.DEV
+    ? "http://localhost:5000"
+    : (import.meta.env.VITE_BACKEND_URL || "http://localhost:5000");
 
   useEffect(() => {
     const fetchProfile = async () => {
@@ -187,10 +193,39 @@ export function ProfileTab() {
     );
   };
 
-  const handleSaveSection = (section: string) => {
-    if (editedProfile) {
-      setProfile(editedProfile);
-      setEditingSection(null);
+  const handleSaveSection = async (section: string) => {
+    if (!editedProfile) return;
+
+    // Special handling for settings section with agent preference
+    if (section === "settings" && profile && editedProfile.agentPreference !== profile.agentPreference) {
+      try {
+        const response = await fetch(`${backendUrl}/api/user/${currentUserId}/agent-preference`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ agent_preference: editedProfile.agentPreference })
+        });
+
+        if (!response.ok) {
+          throw new Error('Failed to update agent preference');
+        }
+
+        const agentConfig = getAgentConfig(editedProfile.agentPreference);
+        toast.success(`Health Companion updated to ${agentConfig.displayName}`);
+
+        // Dispatch event to notify other components
+        window.dispatchEvent(new CustomEvent('agentPreferenceChanged', {
+          detail: { agentPreference: editedProfile.agentPreference }
+        }));
+      } catch (error) {
+        console.error('Failed to update agent preference:', error);
+        toast.error('Failed to update health companion. Please try again.');
+        return;
+      }
+    }
+
+    setProfile(editedProfile);
+    setEditingSection(null);
+    if (section !== "settings" || editedProfile.agentPreference === profile?.agentPreference) {
       toast.success("Changes saved (local preview only)");
     }
   };
@@ -938,6 +973,15 @@ export function ProfileTab() {
                 ]}
                 onChange={(v) => updateField("language", v)}
               />
+              <SelectField
+                label="Health Companion"
+                value={editedProfile.agentPreference}
+                options={[
+                  { value: "olivia", label: "Olivia (Female)" },
+                  { value: "oliver", label: "Oliver (Male)" },
+                ]}
+                onChange={(v) => updateField("agentPreference", v as AgentType)}
+              />
             </div>
           ) : (
             <div className="space-y-3">
@@ -952,6 +996,10 @@ export function ProfileTab() {
               <InfoRow
                 label="Language"
                 value={getLanguageLabel(profile.language)}
+              />
+              <InfoRow
+                label="Health Companion"
+                value={getAgentConfig(profile.agentPreference).displayName + " (" + getAgentConfig(profile.agentPreference).gender.charAt(0).toUpperCase() + getAgentConfig(profile.agentPreference).gender.slice(1) + ")"}
               />
             </div>
           )}
@@ -1569,6 +1617,7 @@ function mapUserRecordToProfile(record: any): UserProfile {
     goals: mapHealthGoalToIds(record.health_goal),
     deviceType: (record.cgm_device_type || defaults.deviceType) as UserProfile['deviceType'],
     userType: record.cgm_device_type ? 'cgm-user' : defaults.userType,
+    agentPreference: (record.agent_preference || defaults.agentPreference) as AgentType,
   };
 }
 

@@ -30,7 +30,11 @@ interface ActivityLogContextValue {
 
 const ActivityLogContext = createContext<ActivityLogContextValue | undefined>(undefined);
 
-const API_BASE = (import.meta.env.VITE_BACKEND_URL ?? "").replace(/\/$/, "");
+const API_BASE = (
+  import.meta.env.DEV
+    ? "http://localhost:5000"
+    : (import.meta.env.VITE_BACKEND_URL ?? "")
+).replace(/\/$/, "");
 const OFFLINE_STORAGE_KEY = "activity-log-offline";
 
 const getCurrentUserId = () => {

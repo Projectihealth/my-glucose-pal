@@ -1,6 +1,32 @@
+import type { AgentType } from '../config/agentConfig';
+
 const DEFAULT_USER_ID = import.meta.env.VITE_DEFAULT_USER_ID || 'user_001';
 
 export const USER_ID_CHANGE_EVENT = 'userIdChanged';
+
+/**
+ * User interface
+ */
+export interface User {
+  user_id: string;
+  name: string;
+  email?: string;
+  gender?: string;
+  date_of_birth?: string;
+  health_goal?: string;
+  conditions?: string;
+  cgm_device_type?: string;
+  agent_preference?: AgentType;  // 新增: 用户偏好的 health companion
+  created_at?: string;
+  updated_at?: string;
+}
+
+/**
+ * 获取用户偏好的 agent（默认为 olivia）
+ */
+export const getPreferredAgent = (user: User | null | undefined): AgentType => {
+  return user?.agent_preference || 'olivia';
+};
 
 const ensureStorage = () => {
   if (typeof window === 'undefined') {
@@ -41,6 +67,9 @@ export const setStoredUserId = (userId: string) => {
     console.error('Failed to persist user id', error);
   }
 };
+
+
+
 
 
 

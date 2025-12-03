@@ -5,15 +5,51 @@
  */
 
 import { useNavigate } from 'react-router-dom';
+import { useState, useEffect } from 'react';
 import { ArrowLeft } from 'lucide-react';
 import { useTavusConversation } from "../../hooks/olivia/useTavusConversation";
 import { CVIProvider } from '@/components/olivia/cvi/components/cvi-provider';
 import { Conversation } from '@/components/olivia/cvi/components/conversation';
+import { getStoredUserId } from '@/utils/userUtils';
+import { getAgentConfig } from '@/config/agentConfig';
 
 function VideoChat() {
   const navigate = useNavigate();
-  const userId = import.meta.env.VITE_DEFAULT_USER_ID || 'user_001';
+  const userId = getStoredUserId();
+  const [agentName, setAgentName] = useState<string>("Olivia");
   const { conversation, isLoading, error, endConversation, retry } = useTavusConversation(userId);
+
+  // Fetch user's agent preference
+  useEffect(() => {
+    const fetchAgentPreference = async () => {
+      try {
+        const backendUrl = import.meta.env.DEV
+          ? "http://localhost:5000"
+          : (import.meta.env.VITE_BACKEND_URL || "http://localhost:5000");
+        const response = await fetch(`${backendUrl}/api/user/${userId}`);
+        if (response.ok) {
+          const userData = await response.json();
+          const agentConfig = getAgentConfig(userData.agent_preference);
+          setAgentName(agentConfig.displayName);
+        }
+      } catch (error) {
+        console.error("Failed to fetch agent preference:", error);
+      }
+    };
+
+    fetchAgentPreference();
+
+    // Listen for agent preference changes
+    const handleAgentPreferenceChange = (event: any) => {
+      const agentConfig = getAgentConfig(event.detail?.agentPreference);
+      setAgentName(agentConfig.displayName);
+    };
+    window.addEventListener('agentPreferenceChanged', handleAgentPreferenceChange);
+
+    return () => {
+      window.removeEventListener('agentPreferenceChanged', handleAgentPreferenceChange);
+    };
+  }, [userId]);
 
   const handleLeave = async () => {
     await endConversation();
@@ -26,7 +62,7 @@ function VideoChat() {
       <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900 flex items-center justify-center max-w-[430px] mx-auto">
         <div className="text-white text-center px-6">
           <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-white mx-auto mb-4"></div>
-          <h2 className="text-xl font-medium mb-2">Connecting to Olivia...</h2>
+          <h2 className="text-xl font-medium mb-2">Connecting to {agentName}...</h2>
           <p className="text-sm text-white/70">Setting up your video call</p>
         </div>
       </div>
@@ -89,7 +125,7 @@ function VideoChat() {
         >
           <ArrowLeft className="w-6 h-6 text-white" />
         </button>
-        <h1 className="text-white font-medium ml-3">Video Chat with Olivia</h1>
+        <h1 className="text-white font-medium ml-3">Video Chat with {agentName}</h1>
       </div>
 
       {/* CVI Conversation Component */}

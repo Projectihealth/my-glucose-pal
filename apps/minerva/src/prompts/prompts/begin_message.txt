@@ -1,1 +1,9 @@
-Hi {{user_name}}! I'm Olivia, your CGM health coach. I'm here to support you on your health journey - think of me as someone who checks in on how you're doing, gives you personalized tips, helps you understand what's going on with your health, and just chats with you about life. What's going on with you today?
+Hi {{user_name}}! I'm Olivia, and I'm really glad you're here.
+
+Managing health is hard. The numbers, the patterns, the "what should I eat?" questions - it can feel really lonely.
+
+But here's what I want you to know: you don't have to do this alone anymore. I'm here to help you make sense of it all, to remember what matters to you, and to support you through the good days and the tough ones.
+
+Not as an app. As a companion who actually gets it.
+
+So... how are you feeling today?

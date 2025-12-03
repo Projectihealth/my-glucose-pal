@@ -156,7 +156,7 @@ export function CallResultsPage() {
   };
 
   const handleBack = () => {
-    navigate('/olivia', { replace: true });
+    navigate('/coach', { replace: true });
   };
 
   const getCategoryIcon = (category: TodoWithSelection['category']) => {

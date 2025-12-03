@@ -30,8 +30,15 @@ logger = logging.getLogger(__name__)
 
 # 从环境变量获取配置
 RETELL_API_KEY = os.getenv("RETELL_API_KEY")
+
+# Olivia (Female agent) - Default
 INTAKE_AGENT_ID = os.getenv("INTAKE_AGENT_ID", "agent_c7d1cb2c279ec45bce38c95067")
 INTAKE_LLM_ID = os.getenv("INTAKE_LLM_ID", "llm_e54c307ce74090cdfd06f682523b")
+
+# Oliver (Male agent)
+OLIVER_AGENT_ID = os.getenv("OLIVER_AGENT_ID", "agent_930e49701ad02a07ad85205bb2")
+OLIVER_LLM_ID = os.getenv("OLIVER_LLM_ID", "llm_74ce06f67d6068bf56c35a20684c")
+
 CGM_BACKEND_URL = os.getenv("CGM_BACKEND_URL", "http://localhost:5000")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 
@@ -320,7 +327,17 @@ async def create_intake_web_call(
         user_info = await get_cgm_butler_user_info(user_id)
 
         user_name = user_info.get('name', 'there')
-        logger.info(f"==== User name: {user_name}")
+        agent_preference = user_info.get('agent_preference', 'olivia')
+
+        # 根据 agent_preference 选择对应的 agent_id
+        if agent_preference == 'oliver':
+            selected_agent_id = OLIVER_AGENT_ID
+            agent_name = "Oliver"
+        else:  # Default to Olivia
+            selected_agent_id = INTAKE_AGENT_ID
+            agent_name = "Olivia"
+
+        logger.info(f"==== User name: {user_name}, Agent preference: {agent_preference} ({agent_name})")
 
         # 步骤 2: 计算年龄
         dob = user_info.get('date_of_birth', '1990-01-01')
@@ -381,19 +398,20 @@ async def create_intake_web_call(
             llm_dynamic_variables["previous_transcript"] = previous_transcript
             logger.info(f"==== Restoring call with {len(previous_transcript)} previous messages")
         
-        # 步骤 5: 创建 Web Call（直接调用 Retell API）
-        logger.info(f"==== Creating web call with agent_id: {INTAKE_AGENT_ID}")
-        
+        # 步骤 5: 创建 Web Call（直接调用 Retell API，使用动态选择的 agent）
+        logger.info(f"==== Creating web call with agent_id: {selected_agent_id} ({agent_name})")
+
         retell = get_retell_client()
-        
+
         metadata = {
             "user_id": user_id,
             "call_type": "cgm_butler_app",
-            "user_name": user_info.get('name', '')
+            "user_name": user_info.get('name', ''),
+            "agent_preference": agent_preference  # 添加agent preference到metadata
         }
-        
+
         web_call_response = retell.call.create_web_call(
-            agent_id=INTAKE_AGENT_ID,
+            agent_id=selected_agent_id,  # 使用动态选择的 agent_id
             metadata=metadata,
             retell_llm_dynamic_variables=llm_dynamic_variables
         )

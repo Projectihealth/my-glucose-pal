@@ -106,6 +106,53 @@ def get_user(user_id):
         return jsonify({'error': str(exc)}), 500
 
 
+@app.route('/api/user/<user_id>/agent-preference', methods=['PUT'])
+def update_agent_preference(user_id):
+    """更新用户的 agent preference API"""
+    try:
+        data = request.get_json()
+        agent_preference = data.get('agent_preference')
+
+        # 验证 agent_preference 值
+        if agent_preference not in ['olivia', 'oliver']:
+            return jsonify({
+                'success': False,
+                'error': 'Invalid agent_preference. Must be "olivia" or "oliver"'
+            }), 400
+
+        # 更新数据库
+        with get_connection() as conn:
+            user_repo = UserRepository(conn)
+
+            # 检查用户是否存在
+            user = user_repo.get_by_id(user_id)
+            if not user:
+                return jsonify({
+                    'success': False,
+                    'error': 'User not found'
+                }), 404
+
+            # 更新 agent preference
+            success = user_repo.update(user_id, agent_preference=agent_preference)
+
+            if success:
+                return jsonify({
+                    'success': True,
+                    'agent_preference': agent_preference
+                })
+            else:
+                return jsonify({
+                    'success': False,
+                    'error': 'Failed to update agent preference'
+                }), 500
+
+    except Exception as exc:
+        return jsonify({
+            'success': False,
+            'error': str(exc)
+        }), 500
+
+
 @app.route('/api/stats/<user_id>')
 def get_stats(user_id):
     """获取统计信息 API"""

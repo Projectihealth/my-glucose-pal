@@ -9,38 +9,23 @@ import { WeeklySummaryModal } from './goalTab/WeeklySummaryModal';
 import * as todosApi from '@/services/todosApi';
 import { Todo } from '@/services/todosApi';
 import { TabHeader } from '@/components/TabHeader';
+import { useTodos, useCreateTodo, useUpdateTodo, useDeleteTodo, useCheckInTodo } from '@/hooks/useTodos';
 
 export function GoalTab() {
   // TODO: Get user_id from authentication context
   const userId = 'user_38377a3b'; // Hardcoded for now - should match your actual user ID
 
-  const [todos, setTodos] = useState<Todo[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  // Use React Query hooks for data fetching with caching
+  const { data: todos = [], isLoading, error } = useTodos(userId);
+  const createTodoMutation = useCreateTodo(userId);
+  const updateTodoMutation = useUpdateTodo(userId);
+  const deleteTodoMutation = useDeleteTodo(userId);
+  const checkInTodoMutation = useCheckInTodo(userId);
 
   const [showAddModal, setShowAddModal] = useState(false);
   const [selectedHistoryWeek, setSelectedHistoryWeek] = useState<string | null>(null);
   const [showWeekPicker, setShowWeekPicker] = useState(false);
   const [showWeeklySummary, setShowWeeklySummary] = useState(false);
-
-  // Fetch todos on component mount
-  useEffect(() => {
-    const fetchTodos = async () => {
-      try {
-        setIsLoading(true);
-        setError(null);
-        const fetchedTodos = await todosApi.getTodos(userId);
-        setTodos(fetchedTodos);
-      } catch (err) {
-        console.error('Failed to fetch todos:', err);
-        setError(err instanceof Error ? err.message : 'Failed to load todos');
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    fetchTodos();
-  }, [userId]);
 
   // Get current week start date (Monday of current week)
   const getCurrentWeekStart = () => {
@@ -116,7 +101,7 @@ export function GoalTab() {
     console.log('handleAddTodo called with:', newTodo);
     try {
       console.log('Calling API to create todo...');
-      const createdTodo = await todosApi.createTodo({
+      await createTodoMutation.mutateAsync({
         user_id: userId,
         title: newTodo.title,
         category: newTodo.category,
@@ -125,9 +110,8 @@ export function GoalTab() {
         current_count: 0,
         status: 'pending',
         week_start: currentWeekStart,
-      });
-      console.log('Todo created successfully:', createdTodo);
-      setTodos(prev => [...prev, createdTodo]);
+      } as any);
+      console.log('Todo created successfully');
       // Modal will be closed by AddTodoModal's handleSubmit
     } catch (err) {
       console.error('Failed to create todo:', err);
@@ -138,8 +122,7 @@ export function GoalTab() {
 
   const handleDeleteTodo = async (id: number) => {
     try {
-      await todosApi.deleteTodo(id);
-      setTodos(prev => prev.filter(t => t.id !== id));
+      await deleteTodoMutation.mutateAsync(id);
     } catch (err) {
       console.error('Failed to delete todo:', err);
       alert('Failed to delete habit. Please try again.');
@@ -148,13 +131,15 @@ export function GoalTab() {
 
   const handleEditTodo = async (updatedTodo: Todo) => {
     try {
-      const updated = await todosApi.updateTodo(updatedTodo.id, {
-        title: updatedTodo.title,
-        target_count: updatedTodo.target_count,
-        current_count: updatedTodo.current_count,
-        status: updatedTodo.status,
+      await updateTodoMutation.mutateAsync({
+        id: updatedTodo.id,
+        updates: {
+          title: updatedTodo.title,
+          target_count: updatedTodo.target_count,
+          current_count: updatedTodo.current_count,
+          status: updatedTodo.status,
+        },
       });
-      setTodos(prev => prev.map(t => t.id === updated.id ? updated : t));
     } catch (err) {
       console.error('Failed to update todo:', err);
       alert('Failed to update habit. Please try again.');
@@ -165,7 +150,7 @@ export function GoalTab() {
     console.log('handleAddToCurrentWeek called with todo:', todo);
     try {
       console.log('Creating todo for current week:', currentWeekStart);
-      const newTodo = await todosApi.createTodo({
+      await createTodoMutation.mutateAsync({
         user_id: userId,
         title: todo.title,
         category: todo.category,
@@ -174,9 +159,8 @@ export function GoalTab() {
         current_count: 0,
         status: 'pending',
         week_start: currentWeekStart,
-      });
-      console.log('Todo added to current week:', newTodo);
-      setTodos(prev => [...prev, newTodo]);
+      } as any);
+      console.log('Todo added to current week');
       
       // 显示成功提示
       alert(`✅ Added "${todo.title}" to this week!`);
@@ -191,8 +175,7 @@ export function GoalTab() {
 
   const handleToggleTodo = async (id: number) => {
     try {
-      const updated = await todosApi.checkInTodo(id, {});
-      setTodos(prev => prev.map(todo => todo.id === updated.id ? updated : todo));
+      await checkInTodoMutation.mutateAsync({ id, data: {} });
     } catch (err) {
       console.error('Failed to check in todo:', err);
       alert('Failed to check in. Please try again.');
@@ -249,7 +232,7 @@ export function GoalTab() {
   if (error) {
     return (
       <div className="p-6 flex justify-center items-center min-h-screen">
-        <div className="text-red-500">{error}</div>
+        <div className="text-red-500">{error instanceof Error ? error.message : 'Failed to load todos'}</div>
       </div>
     );
   }

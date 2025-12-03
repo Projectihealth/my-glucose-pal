@@ -54,6 +54,8 @@ PROMPTS_DIR = os.path.join(
     "prompts"
 )
 OLIVIA_PROMPT_PATH = os.path.join(PROMPTS_DIR, "olivia_coach_prompt.txt")
+OLIVIA_NEW_USER_PROMPT_PATH = os.path.join(PROMPTS_DIR, "olivia_new_user_prompt.txt")
+OLIVIA_RETURNING_USER_PROMPT_PATH = os.path.join(PROMPTS_DIR, "olivia_returning_user_prompt.txt")
 BEGIN_MESSAGE_PATH = os.path.join(PROMPTS_DIR, "begin_message.txt")
 
 # OpenAI Client
@@ -98,6 +100,341 @@ async def get_cgm_butler_user_info(user_id: str) -> Dict[str, Any]:
             "cgm_device_type": "CGM device",
             "date_of_birth": "1990-01-01"
         }
+
+
+async def get_cgm_data_summary(user_id: str) -> Dict[str, Any]:
+    """
+    获取用户CGM数据摘要（精简版，只包含最有用的信息）
+    
+    Returns:
+        包含当前血糖、24小时统计、7天趋势、周对周比较的字典
+    """
+    try:
+        # 1. 获取当前血糖
+        current_glucose = None
+        glucose_status = None
+        last_reading_time = None
+        
+        try:
+            response = requests.get(
+                f"{CGM_BACKEND_URL}/api/glucose/{user_id}",
+                timeout=3
+            )
+            if response.status_code == 200:
+                glucose_data = response.json()
+                current_glucose = glucose_data.get('glucose')
+                glucose_status = glucose_data.get('status')
+                last_reading_time = glucose_data.get('timestamp')
+        except Exception as e:
+            logger.warning(f"Failed to fetch current glucose: {e}")
+        
+        # 2. 获取24小时统计
+        stats_24h = None
+        time_in_range_24h = None
+        
+        try:
+            response = requests.get(
+                f"{CGM_BACKEND_URL}/api/stats/{user_id}",
+                timeout=3
+            )
+            if response.status_code == 200:
+                stats_data = response.json()
+                stats = stats_data.get('stats', {})
+                stats_24h = {
+                    'avg': round(stats.get('avg_glucose', 0), 1) if stats.get('avg_glucose') else None,
+                    'min': stats.get('min_glucose'),
+                    'max': stats.get('max_glucose'),
+                }
+                time_in_range_24h = stats_data.get('time_in_range')
+        except Exception as e:
+            logger.warning(f"Failed to fetch 24h stats: {e}")
+        
+        # 3. 获取最近6小时的读数（用于判断短期趋势）
+        recent_trend = None
+        
+        try:
+            response = requests.get(
+                f"{CGM_BACKEND_URL}/api/recent/{user_id}/12",  # 12个读数约6小时
+                timeout=3
+            )
+            if response.status_code == 200:
+                readings = response.json()
+                if len(readings) >= 2:
+                    # 简单判断趋势：比较最新和30分钟前
+                    latest = readings[0]['glucose_value']
+                    earlier = readings[min(6, len(readings)-1)]['glucose_value']  # 约30分钟前
+                    diff = latest - earlier
+                    
+                    if diff > 15:
+                        recent_trend = "rising"
+                    elif diff < -15:
+                        recent_trend = "falling"
+                    else:
+                        recent_trend = "stable"
+        except Exception as e:
+            logger.warning(f"Failed to fetch recent trend: {e}")
+        
+        # 4. 获取7天数据（用于计算本周平均和上周平均）
+        stats_7d = None
+        stats_prev_7d = None
+        week_over_week_change = None
+        
+        try:
+            from datetime import datetime, timedelta
+            
+            # 本周（最近7天）
+            response = requests.get(
+                f"{CGM_BACKEND_URL}/api/recent/{user_id}/2016",  # 7天 * 24小时 * 12次/小时 = 2016
+                timeout=3
+            )
+            if response.status_code == 200:
+                readings = response.json()
+                
+                if len(readings) > 0:
+                    # 计算本周（最近7天）的平均
+                    now = datetime.now()
+                    seven_days_ago = now - timedelta(days=7)
+                    fourteen_days_ago = now - timedelta(days=14)
+                    
+                    this_week_readings = []
+                    last_week_readings = []
+                    
+                    for reading in readings:
+                        try:
+                            timestamp = datetime.fromisoformat(reading['timestamp'].replace('Z', '+00:00'))
+                            glucose = reading['glucose_value']
+                            
+                            if timestamp >= seven_days_ago:
+                                this_week_readings.append(glucose)
+                            elif timestamp >= fourteen_days_ago:
+                                last_week_readings.append(glucose)
+                        except:
+                            continue
+                    
+                    # 计算本周平均
+                    if this_week_readings:
+                        this_week_avg = sum(this_week_readings) / len(this_week_readings)
+                        this_week_tir = sum(1 for g in this_week_readings if 70 <= g <= 140) / len(this_week_readings) * 100
+                        
+                        stats_7d = {
+                            'avg': round(this_week_avg, 1),
+                            'time_in_range': round(this_week_tir, 1)
+                        }
+                    
+                    # 计算上周平均和周对周变化
+                    if last_week_readings and this_week_readings:
+                        last_week_avg = sum(last_week_readings) / len(last_week_readings)
+                        stats_prev_7d = {
+                            'avg': round(last_week_avg, 1)
+                        }
+                        
+                        # 计算变化
+                        change = this_week_avg - last_week_avg
+                        change_pct = (change / last_week_avg) * 100 if last_week_avg > 0 else 0
+                        
+                        # 判断改进还是恶化
+                        if abs(change) < 3:  # 变化小于3 mg/dL认为是稳定
+                            trend_direction = "stable"
+                        elif change < 0:  # 平均血糖降低
+                            trend_direction = "improved"
+                        else:  # 平均血糖升高
+                            trend_direction = "worsened"
+                        
+                        week_over_week_change = {
+                            'change': round(change, 1),
+                            'change_pct': round(change_pct, 1),
+                            'direction': trend_direction
+                        }
+                        
+        except Exception as e:
+            logger.warning(f"Failed to calculate weekly trends: {e}")
+        
+        # 5. 计算每日模式（早餐后、午餐后、晚餐后、夜间）
+        daily_patterns = None
+        try:
+            if len(readings) > 0:
+                from datetime import datetime
+                
+                breakfast_readings = []  # 7-10 AM
+                lunch_readings = []      # 12-2 PM
+                dinner_readings = []     # 6-9 PM
+                overnight_readings = []  # 12-6 AM
+                
+                for reading in readings:
+                    try:
+                        timestamp = datetime.fromisoformat(reading['timestamp'].replace('Z', '+00:00'))
+                        hour = timestamp.hour
+                        glucose = reading['glucose_value']
+                        
+                        if 7 <= hour < 10:
+                            breakfast_readings.append(glucose)
+                        elif 12 <= hour < 14:
+                            lunch_readings.append(glucose)
+                        elif 18 <= hour < 21:
+                            dinner_readings.append(glucose)
+                        elif 0 <= hour < 6:
+                            overnight_readings.append(glucose)
+                    except:
+                        continue
+                
+                daily_patterns = {
+                    'breakfast_avg': round(sum(breakfast_readings) / len(breakfast_readings), 1) if breakfast_readings else None,
+                    'lunch_avg': round(sum(lunch_readings) / len(lunch_readings), 1) if lunch_readings else None,
+                    'dinner_avg': round(sum(dinner_readings) / len(dinner_readings), 1) if dinner_readings else None,
+                    'overnight_avg': round(sum(overnight_readings) / len(overnight_readings), 1) if overnight_readings else None
+                }
+        except Exception as e:
+            logger.warning(f"Failed to calculate daily patterns: {e}")
+        
+        # 6. 计算波动性（标准差和变异系数）
+        variability = None
+        try:
+            if len(readings) > 0:
+                import statistics
+                glucose_values = [r['glucose_value'] for r in readings if 'glucose_value' in r]
+                
+                if len(glucose_values) > 1:
+                    mean_glucose = statistics.mean(glucose_values)
+                    std_dev = statistics.stdev(glucose_values)
+                    cv = (std_dev / mean_glucose * 100) if mean_glucose > 0 else 0
+                    
+                    variability = {
+                        'std_dev': round(std_dev, 1),
+                        'cv': round(cv, 1),
+                        'stability': 'stable' if cv < 36 else 'variable'  # CV < 36% is considered stable
+                    }
+        except Exception as e:
+            logger.warning(f"Failed to calculate variability: {e}")
+        
+        # 7. 统计低血糖和高血糖事件
+        hypo_hyper_events = None
+        try:
+            if len(readings) > 0:
+                from datetime import datetime, timedelta
+                now = datetime.now()
+                one_day_ago = now - timedelta(days=1)
+                seven_days_ago = now - timedelta(days=7)
+                
+                hypo_24h = 0
+                hyper_24h = 0
+                hypo_7d = 0
+                hyper_7d = 0
+                
+                for reading in readings:
+                    try:
+                        timestamp = datetime.fromisoformat(reading['timestamp'].replace('Z', '+00:00'))
+                        glucose = reading['glucose_value']
+                        
+                        is_hypo = glucose < 70
+                        is_hyper = glucose > 180
+                        
+                        if timestamp >= one_day_ago:
+                            if is_hypo:
+                                hypo_24h += 1
+                            if is_hyper:
+                                hyper_24h += 1
+                        
+                        if timestamp >= seven_days_ago:
+                            if is_hypo:
+                                hypo_7d += 1
+                            if is_hyper:
+                                hyper_7d += 1
+                    except:
+                        continue
+                
+                hypo_hyper_events = {
+                    'hypo_24h': hypo_24h,
+                    'hyper_24h': hyper_24h,
+                    'hypo_7d': hypo_7d,
+                    'hyper_7d': hyper_7d
+                }
+        except Exception as e:
+            logger.warning(f"Failed to calculate hypo/hyper events: {e}")
+        
+        # 8. 找到最近的峰值（过去24小时内的高峰）
+        recent_peaks = None
+        try:
+            if len(readings) > 0:
+                from datetime import datetime, timedelta
+                now = datetime.now()
+                one_day_ago = now - timedelta(days=1)
+                
+                recent_readings = []
+                for reading in readings:
+                    try:
+                        timestamp = datetime.fromisoformat(reading['timestamp'].replace('Z', '+00:00'))
+                        if timestamp >= one_day_ago:
+                            recent_readings.append({
+                                'glucose': reading['glucose_value'],
+                                'timestamp': timestamp
+                            })
+                    except:
+                        continue
+                
+                # 找到最高的3个读数
+                if recent_readings:
+                    sorted_readings = sorted(recent_readings, key=lambda x: x['glucose'], reverse=True)
+                    top_peaks = sorted_readings[:3]
+                    
+                    # 只保留明显的峰值（>160）
+                    significant_peaks = [p for p in top_peaks if p['glucose'] > 160]
+                    
+                    if significant_peaks:
+                        recent_peaks = [{
+                            'glucose': p['glucose'],
+                            'time_ago': _format_time_ago(now, p['timestamp'])
+                        } for p in significant_peaks]
+        except Exception as e:
+            logger.warning(f"Failed to find recent peaks: {e}")
+        
+        return {
+            "has_data": current_glucose is not None,
+            "current": {
+                "glucose": current_glucose,
+                "status": glucose_status,
+                "timestamp": last_reading_time,
+                "trend": recent_trend
+            },
+            "stats_24h": stats_24h,
+            "time_in_range_24h": time_in_range_24h,
+            "stats_7d": stats_7d,
+            "stats_prev_7d": stats_prev_7d,
+            "week_over_week": week_over_week_change,
+            "daily_patterns": daily_patterns,
+            "variability": variability,
+            "hypo_hyper_events": hypo_hyper_events,
+            "recent_peaks": recent_peaks
+        }
+        
+    except Exception as e:
+        logger.error(f"Failed to fetch CGM data summary: {e}")
+        return {
+            "has_data": False,
+            "current": None,
+            "stats_24h": None,
+            "time_in_range_24h": None,
+            "stats_7d": None,
+            "stats_prev_7d": None,
+            "week_over_week": None
+        }
+
+
+def _format_time_ago(now, timestamp):
+    """格式化时间差为可读文本"""
+    try:
+        diff = now - timestamp
+        hours = diff.total_seconds() / 3600
+        
+        if hours < 1:
+            minutes = int(diff.total_seconds() / 60)
+            return f"{minutes} minutes ago"
+        elif hours < 24:
+            return f"{int(hours)} hours ago"
+        else:
+            days = int(hours / 24)
+            return f"{days} days ago"
+    except:
+        return "recently"
 
 
 def calculate_age(date_of_birth: str) -> int:
@@ -153,6 +490,112 @@ async def get_user_memory_context(user_id: str) -> Dict[str, Any]:
             'active_todos': [],
             'recent_conversations': []
         }
+
+
+def format_cgm_data_for_prompt(cgm_data: Dict[str, Any]) -> str:
+    """
+    将CGM数据格式化为简洁的prompt文本
+    
+    Args:
+        cgm_data: CGM数据字典
+        
+    Returns:
+        格式化的文本字符串
+    """
+    if not cgm_data.get("has_data"):
+        return "No CGM data available yet."
+    
+    sections = []
+    
+    # 当前血糖
+    current = cgm_data.get("current", {})
+    if current and current.get("glucose"):
+        glucose = current["glucose"]
+        status = current.get("status", "Unknown")
+        trend = current.get("trend", "")
+        
+        trend_text = ""
+        if trend == "rising":
+            trend_text = " ↗ (rising)"
+        elif trend == "falling":
+            trend_text = " ↘ (falling)"
+        elif trend == "stable":
+            trend_text = " → (stable)"
+        
+        sections.append(f"**Current:** {glucose} mg/dL ({status}){trend_text}")
+    
+    # 24小时统计
+    stats_24h = cgm_data.get("stats_24h")
+    tir_24h = cgm_data.get("time_in_range_24h")
+    if stats_24h and stats_24h.get("avg"):
+        tir_text = f", TIR: {tir_24h}%" if tir_24h is not None else ""
+        sections.append(f"**24h Avg:** {stats_24h['avg']} mg/dL{tir_text}")
+    
+    # 7天统计和周对周比较
+    stats_7d = cgm_data.get("stats_7d")
+    week_change = cgm_data.get("week_over_week")
+    
+    if stats_7d and stats_7d.get("avg"):
+        week_text = f"**7-Day Avg:** {stats_7d['avg']} mg/dL"
+        
+        # 添加周对周变化
+        if week_change:
+            direction = week_change.get('direction')
+            change = week_change.get('change')
+            
+            if direction == "improved":
+                week_text += f" (↓ {abs(change)} from last week - improving!)"
+            elif direction == "worsened":
+                week_text += f" (↑ {change} from last week - needs attention)"
+            else:
+                week_text += " (stable week-over-week)"
+        
+        sections.append(week_text)
+    
+    # 每日模式
+    daily_patterns = cgm_data.get("daily_patterns")
+    if daily_patterns:
+        pattern_parts = []
+        if daily_patterns.get('breakfast_avg'):
+            pattern_parts.append(f"Breakfast: {daily_patterns['breakfast_avg']} mg/dL")
+        if daily_patterns.get('lunch_avg'):
+            pattern_parts.append(f"Lunch: {daily_patterns['lunch_avg']} mg/dL")
+        if daily_patterns.get('dinner_avg'):
+            pattern_parts.append(f"Dinner: {daily_patterns['dinner_avg']} mg/dL")
+        if daily_patterns.get('overnight_avg'):
+            pattern_parts.append(f"Overnight: {daily_patterns['overnight_avg']} mg/dL")
+        
+        if pattern_parts:
+            sections.append(f"**Daily Patterns:** {', '.join(pattern_parts)}")
+    
+    # 波动性
+    variability = cgm_data.get("variability")
+    if variability and variability.get('cv'):
+        cv = variability['cv']
+        stability = variability.get('stability', 'unknown')
+        sections.append(f"**Variability:** CV {cv}% ({stability})")
+    
+    # 低血糖/高血糖事件
+    events = cgm_data.get("hypo_hyper_events")
+    if events:
+        event_parts = []
+        if events.get('hypo_24h', 0) > 0:
+            event_parts.append(f"{events['hypo_24h']} low episodes (24h)")
+        if events.get('hyper_24h', 0) > 0:
+            event_parts.append(f"{events['hyper_24h']} high episodes (24h)")
+        
+        if event_parts:
+            sections.append(f"**Events:** {', '.join(event_parts)}")
+        elif events.get('hypo_24h', 0) == 0 and events.get('hyper_24h', 0) == 0:
+            sections.append("**Events:** No hypo/hyper episodes in past 24h ✓")
+    
+    # 最近的峰值
+    peaks = cgm_data.get("recent_peaks")
+    if peaks and len(peaks) > 0:
+        peak_texts = [f"{p['glucose']} mg/dL ({p['time_ago']})" for p in peaks[:2]]  # 只显示前2个
+        sections.append(f"**Recent Peaks:** {', '.join(peak_texts)}")
+    
+    return "\n".join(sections) if sections else "CGM data available but incomplete."
 
 
 def format_memory_for_prompt(memory_context: Dict[str, Any]) -> str:
@@ -229,26 +672,84 @@ async def create_intake_web_call(
 
         logger.info(f"==== Onboarding stage: {onboarding_stage}, completion: {completion_score}%")
 
+        # 获取当前时间信息（用于 time awareness 和 memory formatting）
+        import pytz
+        pacific_tz = pytz.timezone('America/Los_Angeles')
+        now = datetime.now(pacific_tz)
+        
+        current_date = now.strftime("%A, %B %d, %Y")  # "Monday, December 02, 2025"
+        current_time = now.strftime("%I:%M %p %Z")     # "02:30 PM PST"
+        current_day_of_week = now.strftime("%A")       # "Monday"
+        
+        logger.info(f"==== Current time: {current_date} {current_time}")
+
         # 获取用户记忆上下文
         memory_context = await get_user_memory_context(user_id)
         memory_text = format_memory_for_prompt(memory_context)
 
         logger.info(f"==== Memory context loaded: {len(memory_text)} chars")
 
-        # 基础动态变量
+        # 获取CGM数据摘要
+        cgm_data = await get_cgm_data_summary(user_id)
+        cgm_text = format_cgm_data_for_prompt(cgm_data)
+        
+        logger.info(f"==== CGM data loaded: has_data={cgm_data.get('has_data', False)}")
+
+        # 判断是否为新用户：
+        # 1. 如果有对话历史或记忆，就是returning user
+        # 2. 如果completion_score >= 80，就是returning user
+        # 3. 否则才是新用户
+        has_conversation_history = (
+            memory_context.get('recent_conversations') and len(memory_context.get('recent_conversations', [])) > 0
+        ) or (
+            memory_context.get('recent_memories') and len(memory_context.get('recent_memories', [])) > 0
+        )
+        
+        is_new_user = not has_conversation_history and completion_score < 80
+        is_new_user_str = "true" if is_new_user else "false"
+        
+        logger.info(f"==== User type: is_new_user={is_new_user_str}, has_history={bool(has_conversation_history)}, score={completion_score}")
+        
+        # 根据用户类型选择对应的prompt并更新LLM
+        if is_new_user:
+            selected_prompt_path = OLIVIA_NEW_USER_PROMPT_PATH
+            logger.info(f"==== Using NEW USER prompt for Olivia")
+        else:
+            selected_prompt_path = OLIVIA_RETURNING_USER_PROMPT_PATH
+            logger.info(f"==== Using RETURNING USER prompt for Olivia")
+        
+        # 动态更新LLM的prompt（不更新begin_message，让LLM自己决定开场白）
+        logger.info(f"==== Updating LLM {INTAKE_LLM_ID} with prompt: {selected_prompt_path}")
+        try:
+            await update_llm_settings({
+                'llm_id': INTAKE_LLM_ID,
+                'prompt_path': selected_prompt_path,
+                'use_default_begin_message': False  # 不使用静态begin_message
+            })
+        except Exception as e:
+            logger.error(f"==== Failed to update LLM settings: {e}")
+            # 继续执行，不要因为更新失败就中断
+        
+        # 基础动态变量（确保所有值都是字符串）
         llm_dynamic_variables = {
-            "user_name": user_name,
+            "user_name": str(user_name),
             "user_age": str(age),
-            "user_health_goal": user_info.get('health_goal', 'managing your health'),
-            "user_conditions": user_info.get('conditions', 'your health'),
-            "user_cgm_device": user_info.get('cgm_device_type', 'CGM device'),
-            "user_memory_context": memory_text,
-            "onboarding_stage": onboarding_stage,
+            "user_health_goal": str(user_info.get('health_goal') or 'managing your health'),
+            "user_conditions": str(user_info.get('conditions') or 'your health'),
+            "user_cgm_device": str(user_info.get('cgm_device_type') or 'CGM device'),
+            "user_memory_context": str(memory_text),
+            "user_cgm_data": str(cgm_text),
+            "onboarding_stage": str(onboarding_stage),
             "completion_score": str(completion_score),
-            "is_new_user": "true" if onboarding_stage in ['not_started', 'in_progress'] and completion_score < 80 else "false",
+            "is_new_user": is_new_user_str,  # ⭐ 新/老用户标识（虽然现在用不同prompt，但保留这个变量）
+            # ⭐ Time awareness variables
+            "current_date": str(current_date),  # e.g., "Monday, December 02, 2025"
+            "current_time": str(current_time),  # e.g., "02:30 PM PST"
+            "current_day_of_week": str(current_day_of_week),  # e.g., "Monday"
         }
 
-        logger.info(f"==== Dynamic variables set: is_new_user={llm_dynamic_variables['is_new_user']}, onboarding_stage={onboarding_stage}")
+        logger.info(f"==== Dynamic variables set: is_new_user={is_new_user_str}, prompt={os.path.basename(selected_prompt_path)}")
+        logger.info(f"==== CGM data in variables:\n{cgm_text if cgm_text else 'None'}")
 
         if previous_transcript:
             llm_dynamic_variables["previous_transcript"] = previous_transcript
@@ -368,7 +869,9 @@ async def update_llm_settings(settings: Dict[str, Any]) -> Dict[str, Any]:
     try:
         llm_id = settings.get('llm_id', INTAKE_LLM_ID)
         prompt_path = settings.get('prompt_path', OLIVIA_PROMPT_PATH)
+        use_default_begin_message = settings.get('use_default_begin_message', False)
         
+        logger.info(f"==== Loading prompt from {prompt_path}")
         general_prompt = load_prompt_from_file(prompt_path)
         
         retell = get_retell_client()
@@ -378,8 +881,20 @@ async def update_llm_settings(settings: Dict[str, Any]) -> Dict[str, Any]:
             "start_speaker": "agent"  # Required parameter: who speaks first
         }
 
+        # Handle begin_message
         if settings.get('begin_message'):
+            # Use custom begin_message if provided
             update_params["begin_message"] = settings['begin_message']
+            logger.info(f"==== Using custom begin_message")
+        elif use_default_begin_message:
+            # Load from file if requested
+            try:
+                default_begin_message = load_prompt_from_file(BEGIN_MESSAGE_PATH)
+                update_params["begin_message"] = default_begin_message
+                logger.info(f"==== Using default begin_message from file: {BEGIN_MESSAGE_PATH}")
+                logger.info(f"==== Begin message preview: {default_begin_message[:100]}...")
+            except Exception as e:
+                logger.warning(f"==== Failed to load default begin_message: {e}")
 
         response = retell.llm.update(llm_id=llm_id, **update_params)
         

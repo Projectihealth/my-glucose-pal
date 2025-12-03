@@ -149,9 +149,23 @@ def update_agent():
         updated_llm = client.llm.update(
             llm_id=llm_id,
             general_prompt=SYSTEM_PROMPT,
+            # 全局清空 LLM 级别的 begin_message，避免固定的新用户开场白
+            begin_message="",
             start_speaker=current_llm.start_speaker if hasattr(current_llm, 'start_speaker') else 'agent'
         )
         
+        # Clear agent-level begin_message so greeting is fully controlled by LLM
+        print()
+        print("🧹 清理 Agent 级别的 begin_message（避免旧的新用户开场白抢先播放）...")
+        try:
+            updated_agent = client.agent.update(
+                agent_id=INTAKE_AGENT_ID,
+                begin_message=""
+            )
+            print("✅ Agent begin_message 已清空（设为 \"\"），后续开场白将完全由 LLM 决定")
+        except Exception as e:
+            print(f"⚠️ 无法更新 Agent begin_message: {e}")
+
         print("✅ Agent 更新成功!")
         print()
         print("=" * 80)
